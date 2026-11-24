@@ -258,11 +258,14 @@ Nhóm đã chạy bộ dữ liệu pilot 1.000 đơn với seed 42 trên máy c�
 
 Doanh thu gộp ghi nhận **601.330,15**; doanh thu loại đơn CANCELLED và RETURNED là **529.555,44**. Tổng là 27.857 dòng MySQL và 24.110 documents MongoDB (items/payments được nhúng trong orders).
 
+**Lưu ý về phiên bản kiểm thử:** các kết quả dưới đây là log kiểm thử chức năng cục bộ của nhóm trước đợt chỉnh sửa code được đưa vào repository này. Chúng là bằng chứng lịch sử cho logic và dữ liệu pilot, không thay thế việc chạy lại trên đúng commit hiện tại.
+
 Theo log kiểm thử cục bộ do nhóm ghi nhận:
 - Q1–Q8 đã chạy trên cả hai hệ và kết quả nghiệp vụ được đối chiếu khớp.
 - W1 thành công đã được kiểm tra trên cả hai hệ.
 - MySQL W1 đã được kiểm tra rollback khi số lượng vượt miền dữ liệu và khi tồn kho không đủ; order/payment/item không còn sau rollback.
 - W2 và W3 đã được kiểm tra ở luồng thành công.
+- Các thay đổi mới trong `07_write_workload_mysql.sql`, `03_mongodb_schema.js` và `06_queries_mongodb.js` đã qua rà soát tĩnh; cần chạy lại kiểm thử runtime trên commit hiện tại trước khi nghiệm thu cuối.
 - Execution Plan Q1 MySQL dùng PRIMARY; Q2 MySQL dùng `idx_orders_customer_date`. MongoDB Q1 dùng `_id_`; Q2 dùng index khách hàng/ngày.
 - Đây là **kiểm thử chức năng và kiểm tra execution plan trên pilot**, không phải benchmark thời gian đủ điều kiện để kết luận hệ nào nhanh hơn.
 
