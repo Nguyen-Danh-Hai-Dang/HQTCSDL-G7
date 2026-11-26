@@ -130,11 +130,12 @@ def main():
         if p.text.strip() == "12. KẾT QUẢ BENCHMARK VÀ TRẢ LỜI RQ5–RQ6"
     ]
     if len(headings) > 1:
-        paragraphs = list(doc.paragraphs)
-        first_index = next(i for i, p in enumerate(paragraphs) if p._p is headings[0]._p)
-        second_index = next(i for i, p in enumerate(paragraphs) if p._p is headings[1]._p)
-        for p in paragraphs[first_index:second_index]:
-            p._element.getparent().remove(p._element)
+        body = doc._element.body
+        elements = list(body)
+        first_index = next(i for i, element in enumerate(elements) if element is headings[0]._p)
+        second_index = next(i for i, element in enumerate(elements) if element is headings[1]._p)
+        for element in elements[first_index:second_index]:
+            body.remove(element)
 
     paragraphs = list(doc.paragraphs)
 
