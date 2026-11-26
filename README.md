@@ -78,7 +78,7 @@ Các quy mô định nghĩa sẵn:
 | `--scale m` | 1.000.000 |
 | `--scale l` | 10.000.000 |
 
-Có thể dùng `--orders N` để chỉ định quy mô tuỳ chỉnh. N phải là số nguyên dương. Cùng seed và cùng tham số sẽ tạo dữ liệu tái lập. Việc sinh dữ liệu quy mô lớn cần đủ dung lượng cho CSV, JSONL, database và index; không nên chạy quy mô lớn trên máy thiếu RAM hoặc dung lượng trống.
+Có thể dùng `--orders N` để chỉ định quy mô tuỳ chỉnh. N phải là số nguyên dương. Cùng phiên bản generator, seed và tham số sẽ tạo CSV/JSONL giống hệt nhau; `elapsed_seconds` trong manifest thay đổi theo thời gian chạy nên không dùng để so sánh byte-level. Mỗi đơn chỉ chọn sản phẩm có bản ghi inventory tại cửa hàng của đơn. Generator không trừ tồn kho tích lũy khi sinh lịch sử đơn hàng; inventory quantity bằng 0 vẫn là một bản ghi inventory hợp lệ. Việc sinh dữ liệu quy mô lớn cần đủ dung lượng cho CSV, JSONL, database và index; không nên chạy quy mô lớn trên máy thiếu RAM hoặc dung lượng trống.
 
 ## 6. Triển khai MySQL
 
@@ -164,7 +164,7 @@ Nạp procedure:
 Get-Content .\07_write_workload_mysql.sql -Raw | & "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" -u root -p shop_bench
 ```
 
-Trước khi gọi W1, tìm một cửa hàng có ít nhất hai sản phẩm khác nhau và đủ tồn kho. MySQL có thể tìm cặp phù hợp bằng truy vấn sau:
+W1 hiện nhận `p_lines` kiểu JSON và hỗ trợ từ 1 đến 50 sản phẩm khác nhau. Mỗi phần tử có dạng `{"pid": product_id, "qty": quantity}`; `pid` và `qty` phải là JSON integer dương, quantity tối đa 65.535. Trước khi gọi W1, tìm hai sản phẩm tại cùng cửa hàng và đủ tồn kho:
 
 ```sql
 SELECT a.store_id, a.product_id AS product_1, b.product_id AS product_2
@@ -174,17 +174,28 @@ WHERE a.quantity >= 2 AND b.quantity >= 1
 LIMIT 1;
 ```
 
-Dùng store_id/product_1/product_2 vừa tìm được, cùng customer_id đang tồn tại (ví dụ 506 trên pilot), thay các placeholder trong lệnh sau rồi thực thi:
+Dùng các ID vừa tìm được và customer_id đang tồn tại. Ví dụ dưới đây dùng customer 506 trên pilot; hãy thay nếu dataset hiện tại không có ID này:
 
 ```sql
-CALL W1_create_order(100000001, 900000001, 506, <store_id>, <product_1>, 2, <product_2>, 1);
+CALL W1_create_order(
+  100000001, 900000001, 506, @w1_store_id,
+  JSON_ARRAY(
+    JSON_OBJECT('pid', @w1_product_1, 'qty', 2),
+    JSON_OBJECT('pid', @w1_product_2, 'qty', 1)
+  )
+);
 ```
 
 Ví dụ W2 và W3:
 
 ```sql
-CALL W2_mark_paid(8);
-CALL W3_restock(7, 5, 50);
+CALL W2_mark_paid(100000001);
+
+SELECT store_id, product_id
+INTO @w3_store_id, @w3_product_id
+FROM inventory
+LIMIT 1;
+CALL W3_restock(@w3_store_id, @w3_product_id, 50);
 ```
 
 Các ID chỉ là ví dụ cho pilot đã kiểm thử. Hãy chọn ID tồn tại trong dataset hiện tại; không chạy lại cùng ID vì khoá chính sẽ trùng.
@@ -213,19 +224,22 @@ Q8()
 verifyLoad()
 ```
 
-W1 yêu cầu replica set:
+W1 yêu cầu replica set. Ví dụ chọn một inventory row đang có ít nhất 2 đơn vị và một customer hiện có:
 
 ```javascript
-W1_txn(100000001, 900000001, 506, 1, [
-  { pid: 2, qty: 2 }
+const inv = db.inventory.findOne({ quantity: { $gte: 2 } });
+const customer = db.customers.findOne();
+W1_txn(100000001, 900000001, customer._id, inv.store_id, [
+  { pid: inv.product_id, qty: 2 }
 ])
 ```
 
-W2 và W3:
+W2 nhận order ID tường minh; W3 nhận store ID, product ID và số lượng tường minh:
 
 ```javascript
-W2()
-W3()
+W2(100000001)
+const restockRow = db.inventory.findOne();
+W3(restockRow.store_id, restockRow.product_id, 50)
 ```
 
 W1 kiểm tra ID, khách hàng, cửa hàng, sản phẩm, số lượng và tồn kho. Nếu một cập nhật tồn kho thất bại, transaction bị huỷ, tránh để lại đơn hàng không có phần trừ kho tương ứng.
@@ -290,7 +304,7 @@ MySQL:
 EXPLAIN FORMAT=TREE
 SELECT order_id, order_date, status
 FROM orders
-WHERE customer_id = 5439
+WHERE customer_id = 506
 ORDER BY order_date DESC, order_id DESC
 LIMIT 20;
 ```
@@ -299,7 +313,7 @@ MongoDB:
 
 ```javascript
 db.orders.find(
-  { customer_id: 5439 },
+  { customer_id: 506 },
   { order_date: 1, status: 1 }
 ).sort({ order_date: -1, _id: -1 }).limit(20).explain("executionStats")
 ```
