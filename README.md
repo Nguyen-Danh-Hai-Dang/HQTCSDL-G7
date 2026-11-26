@@ -203,7 +203,7 @@ LIMIT 1;
 CALL W3_restock(@w3_store_id, @w3_product_id, 50);
 ```
 
-Các ID chỉ là ví dụ cho pilot đã kiểm thử. Hãy chọn ID tồn tại trong dataset hiện tại; không chạy lại cùng ID vì khoá chính sẽ trùng.
+Order ID và payment ID trong ví dụ phải chưa tồn tại ở cả hai hệ thống. Nếu chạy lại, hãy thay bằng ID mới để tránh xung đột khoá chính.
 
 ### MongoDB
 
