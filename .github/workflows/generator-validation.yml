@@ -9,6 +9,34 @@ on:
       - main
 
 jobs:
+  mysql-workload:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+      - name: Create MySQL schema
+        run: mysql -h 127.0.0.1 -P 3306 -uroot -proot < 01_mysql_schema.sql
+      - name: Install write procedures
+        run: mysql -h 127.0.0.1 -P 3306 -uroot -proot shop_bench < 07_write_workload_mysql.sql
+      - name: Run W1/W3 integration assertions
+        run: mysql --show-warnings -h 127.0.0.1 -P 3306 -uroot -proot shop_bench < tests/mysql_workload_integration.sql
+
   generator-pilot:
     runs-on: ubuntu-latest
     steps:
