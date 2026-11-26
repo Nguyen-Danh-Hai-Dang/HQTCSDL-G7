@@ -198,15 +198,15 @@ function W2(orderId) {
 function W3(storeId, productId, quantity) {
   if (!Number.isSafeInteger(storeId) || storeId <= 0 || storeId > 65535 ||
       !Number.isSafeInteger(productId) || productId <= 0 || productId > 4294967295 ||
-      !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 4294967295)
+      !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 2147483647)
     throw new Error("INVALID_RESTOCK_ARGUMENTS");
   const result = db.inventory.updateOne(
     { store_id: storeId, product_id: productId,
-      quantity: { $lte: 4294967295 - quantity } },
+      quantity: { $lte: 2147483647 - quantity } },
     { $inc: { quantity } }
   );
   if (result.matchedCount !== 1)
-    throw new Error("INVENTORY_ROW_NOT_FOUND_OR_QUANTITY_OVERFLOW");
+    throw new Error("INVENTORY_ROW_NOT_FOUND_OR_INT32_OVERFLOW");
   return result;
 }
 
