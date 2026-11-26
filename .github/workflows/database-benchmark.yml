@@ -1,0 +1,120 @@
+name: Database read benchmark
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "benchmark/**"
+      - "04_generate_data.py"
+      - "01_mysql_schema.sql"
+      - "02_mysql_indexes.sql"
+      - "03_mongodb_schema.js"
+      - "03b_mongodb_indexes.js"
+      - "05_queries_mysql.sql"
+      - "06_queries_mongodb.js"
+      - "08_load_mysql.sql"
+      - ".github/workflows/database-benchmark.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Benchmark \${{ matrix.scale }} dataset
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        scale: [s, m]
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install benchmark dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r benchmark/requirements.txt
+
+      - name: Start MongoDB replica set
+        run: |
+          docker run -d --name mongo-rs -p 27017:27017 mongo:8.0 mongod --replSet rs0 --bind_ip_all
+          for i in $(seq 1 60); do
+            if docker exec mongo-rs mongosh --quiet --eval 'db.adminCommand("ping").ok' >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          docker exec mongo-rs mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]})'
+          for i in $(seq 1 60); do
+            if docker exec mongo-rs mongosh --quiet --eval 'db.hello().isWritablePrimary' | grep -q true; then
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Enable local CSV loading
+        run: mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "SET GLOBAL local_infile=1"
+
+      - name: Generate the shared dataset
+        run: python 04_generate_data.py --scale "\${{ matrix.scale }}" --seed 42 --out data
+
+      - name: Create MySQL schema and load CSV
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot < 01_mysql_schema.sql
+          sed "s#C:/PATH/TO/PROJECT#$(pwd)#g" 08_load_mysql.sql > /tmp/load_mysql.sql
+          mysql --local-infile=1 -h 127.0.0.1 -P 3306 -uroot -proot < /tmp/load_mysql.sql
+
+      - name: Load MongoDB Extended JSONL
+        run: python benchmark/run_benchmark.py --scale "\${{ matrix.scale }}" --load-mongo --data-dir "data/\${{ matrix.scale }}" --out "benchmark/results/\${{ matrix.scale }}"
+
+      - name: Run baseline benchmark
+        run: python benchmark/run_benchmark.py --scale "\${{ matrix.scale }}" --mode baseline --out "benchmark/results/\${{ matrix.scale }}"
+
+      - name: Build workload indexes
+        run: python benchmark/run_benchmark.py --scale "\${{ matrix.scale }}" --build-indexes --out "benchmark/results/\${{ matrix.scale }}"
+
+      - name: Restart databases to clear process caches
+        run: |
+          MYSQL_CONTAINER="$(docker ps --filter ancestor=mysql:8.4 --format '{{.ID}}' | head -n 1)"
+          test -n "$MYSQL_CONTAINER"
+          docker restart "$MYSQL_CONTAINER"
+          docker restart mongo-rs
+          for i in $(seq 1 60); do
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -proot >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          for i in $(seq 1 60); do
+            if docker exec mongo-rs mongosh --quiet --eval 'db.hello().isWritablePrimary' | grep -q true; then break; fi
+            sleep 2
+          done
+
+      - name: Run indexed benchmark
+        run: python benchmark/run_benchmark.py --scale "\${{ matrix.scale }}" --mode indexed --out "benchmark/results/\${{ matrix.scale }}"
+
+      - name: Upload raw and summarized results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-\${{ matrix.scale }}
+          path: benchmark/results/\${{ matrix.scale }}/
+          if-no-files-found: error
+          retention-days: 30
