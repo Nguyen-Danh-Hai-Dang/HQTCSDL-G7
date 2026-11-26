@@ -780,6 +780,10 @@ cập 24/11/2026).
 | 06_queries_mongodb.js       | Workload MongoDB Q1–Q8, W1–W3 và verifyLoad().       |
 | 07_write_workload_mysql.sql | Stored procedures W1–W3 có kiểm tra/rollback.        |
 | 08_load_mysql.sql           | Nạp CSV vào MySQL bằng LOAD DATA LOCAL INFILE.       |
+| tests/test_generator_w1.py   | Kiểm tra generator, inventory integrity và tính tái lập. |
+| tests/mysql_workload_integration.sql | Kiểm thử W1/W3 trên MySQL 8.4 bằng fixture CI. |
+| tests/mongodb_workload_integration.js | Kiểm thử W1/W2/W3 trên MongoDB replica set. |
+| .github/workflows/generator-validation.yml | Tự động chạy generator và integration tests trên CI. |
 
 ## PHỤ LỤC B. Quy ước diễn giải số liệu
 
