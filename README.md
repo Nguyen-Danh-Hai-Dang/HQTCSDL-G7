@@ -43,9 +43,16 @@ Dữ liệu là **dữ liệu tổng hợp**, không phải giao dịch của c�
 │   ├── test_generator_w1.py
 │   ├── mysql_workload_integration.sql
 │   └── mongodb_workload_integration.js
+├── benchmark/
+│   ├── requirements.txt
+│   └── run_benchmark.py
 ├── .github/
 │   └── workflows/
-│       └── generator-validation.yml
+│       ├── generator-validation.yml
+│       ├── database-benchmark.yml
+│       └── sync-report-docx.yml
+├── scripts/
+│   └── sync_report_docx.py
 ├── .gitignore
 └── README.md
 ```
@@ -302,18 +309,35 @@ Theo log kiểm thử cục bộ do nhóm ghi nhận:
 - Execution Plan Q1 MySQL dùng PRIMARY; Q2 MySQL dùng `idx_orders_customer_date`. MongoDB Q1 dùng `_id_`; Q2 dùng index khách hàng/ngày.
 - Đây là **kiểm thử chức năng và kiểm tra execution plan trên pilot**, không phải benchmark thời gian đủ điều kiện để kết luận hệ nào nhanh hơn.
 
-## 10. Đo hiệu năng một cách công bằng
+## 10. Benchmark đọc Q1–Q8
 
-Khi benchmark:
-1. Dùng cùng bộ dữ liệu, seed và tham số truy vấn.
-2. Tách thời gian import, tạo index và thực thi truy vấn.
-3. Warm-up trước khi đo; lặp nhiều lần và báo cáo median/percentile.
-4. Ghi CPU, RAM, ổ đĩa, phiên bản server, cache, concurrency và trạng thái replica set.
-5. Tách index nền tảng khỏi secondary index theo workload.
-6. Đo cả read và write; không so transaction MySQL với thao tác MongoDB không transaction như thể cùng mức bảo đảm.
-7. Lưu raw results và script benchmark để tái lập.
+Repository có harness benchmark chung tại `benchmark/run_benchmark.py` và workflow GitHub Actions `.github/workflows/database-benchmark.yml`.
 
-**Repository chưa có kết quả benchmark latency/throughput quy mô lớn đã được xác minh.** Không dùng thời gian chạy generator hoặc executionTimeMillis đơn lẻ trong explain làm benchmark tổng thể.
+**Kết quả đã xác minh:** [GitHub Actions run #7](https://github.com/Nguyen-Danh-Hai-Dang/HQTCSDL-G7/actions/runs/45774155670) hoàn tất thành công ở hai quy mô:
+
+| Quy mô | Đơn hàng | Kết quả |
+|---|---:|---|
+| `s` | 100.000 | <badge color="success">PASS</badge> |
+| `m` | 1.000.000 | <badge color="success">PASS</badge> |
+| `l` | 10.000.000 | Chưa chạy |
+
+Thiết lập benchmark:
+- MySQL 8.4.13 và MongoDB 8.0.38; Python 3.12.16.
+- Runner Ubuntu có 4 logical CPU và khoảng 16 GB RAM; hai quy mô chạy trên CPU model khác nhau.
+- InnoDB buffer pool và WiredTiger cache đều giới hạn 1 GiB.
+- 5 lượt warm-up, 30 lượt đo cho mỗi truy vấn, một client tuần tự.
+- So sánh baseline (giữ index bắt buộc của schema/constraint) với cấu hình bổ sung workload secondary index.
+- Cardinality kết quả Q1–Q8 khớp giữa hai DBMS trong cả hai chế độ.
+
+Một số kết quả median:
+- Q3 giảm 95,9–99,9% tuỳ DBMS và quy mô.
+- MongoDB Q2 giảm 99,2–99,9%.
+- Q5, Q6 và Q8 cũng cải thiện đáng kể.
+- Q4 chậm hơn sau khi thêm index; Q1 và Q7 thay đổi nhỏ.
+
+Raw CSV, summary CSV, metadata và thời gian tạo index có trong artifacts `benchmark-s` và `benchmark-m` của run #7. Bảng latency đầy đủ và phần diễn giải được trình bày trong `report/bao_cao_HQTCSDL_G7.md` và bản Word.
+
+**Giới hạn:** đây là benchmark truy vấn đọc tuần tự, không phải tải đồng thời. CI chưa thu CPU utilization, I/O hoặc cache hit/miss theo từng truy vấn. Quy mô 10 triệu đơn chưa chạy vì riêng file dữ liệu thô ước lượng khoảng 7 GB, chưa tính dung lượng hai CSDL và index. Không ngoại suy kết quả 100 nghìn/1 triệu thành kết luận cho 10 triệu.
 
 ## 11. Execution Plan
 
@@ -342,11 +366,12 @@ Phân tích access path, index được chọn, số keys/documents examined, s�
 ## 12. Hạn chế
 
 - Dữ liệu tổng hợp không mô tả đầy đủ phân bố giao dịch thực tế.
-- Truy vấn phân tích phụ thuộc mạnh vào quy mô dữ liệu và cấu hình máy.
+- Chỉ benchmark hai quy mô 100.000 và 1.000.000 đơn; chưa chạy 10.000.000 đơn.
+- Chỉ so sánh baseline với một cấu hình workload secondary index, chưa cô lập đóng góp của từng loại index.
+- Hai quy mô chạy trên CPU model khác nhau nên không thể dùng chênh lệch tuyệt đối để suy ra tốc độ tăng trưởng do dữ liệu.
+- Benchmark dùng một client tuần tự; chưa đo throughput đồng thời, CPU utilization, I/O hoặc cache hit/miss theo truy vấn.
 - MySQL chuẩn hoá và MongoDB nhúng document có hình dạng lưu trữ khác nhau; cần nêu rõ khác biệt khi diễn giải số lần đọc/ghi.
-- Pilot dùng để xác nhận logic, không đại diện cho workload lớn.
-- So sánh hiệu năng cần benchmark có kiểm soát, nhiều lần lặp và raw results.
 
 ## 13. Báo cáo
 
-Báo cáo học thuật 18 trang được lưu trong thư mục `report/` ở cả định dạng Word và Markdown. Các tài liệu tham khảo trong báo cáo được phân biệt với số liệu thực nghiệm của nhóm.
+Báo cáo học thuật được lưu trong thư mục `report/` ở cả định dạng Word và Markdown. Báo cáo ghi rõ thiết lập, kết quả median, giới hạn thực nghiệm và các hạng mục chưa đo.
