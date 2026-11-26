@@ -123,88 +123,180 @@ def main():
         raise SystemExit(f"Missing report: {DOCX}")
 
     doc = Document(DOCX)
+
+    # Remove the earlier text-only duplicate; retain the section that contains the table.
+    headings = [
+        p for p in doc.paragraphs
+        if p.text.strip() == "12. KẾT QUẢ BENCHMARK VÀ TRẢ LỜI RQ5–RQ6"
+    ]
+    if len(headings) > 1:
+        paragraphs = list(doc.paragraphs)
+        first_index = paragraphs.index(headings[0])
+        second_index = paragraphs.index(headings[1])
+        for p in paragraphs[first_index:second_index]:
+            p._element.getparent().remove(p._element)
+
     paragraphs = list(doc.paragraphs)
-    print("DOCX_PARAGRAPHS_BEGIN")
-    for i, paragraph in enumerate(paragraphs):
-        print(f"P{i}: {paragraph.text}")
-    print("DOCX_TABLE_COUNT", len(doc.tables))
 
-    # Refresh the abstract and existing RQ conclusions.
     replace_first(
         paragraphs,
-        "Chưa có bộ số liệu latency/throughput",
-        "Benchmark GitHub Actions đã đo Q1–Q8 ở 100.000 và 1.000.000 đơn, "
-        "mỗi truy vấn 30 lần sau 5 lượt warm-up. Kết quả cho thấy secondary "
-        "index cải thiện mạnh một số truy vấn, đặc biệt Q3 và MongoDB Q2; "
-        "Q4 không cải thiện. Quy mô 10.000.000 đơn chưa được chạy."
+        "Vì vậy, báo cáo trả lời đầy đủ khía cạnh lý thuyết",
+        "RQ4 và RQ5 đã có bằng chứng định lượng ở hai quy mô 100.000 và "
+        "1.000.000 đơn. RQ6 mới có kết quả ở hai mức này, chưa đủ để kết "
+        "luận xu hướng ở 10 triệu đơn. Khuyến nghị RQ7 phụ thuộc workload, "
+        "mô hình dữ liệu, index và tài nguyên triển khai."
     )
     replace_first(
         paragraphs,
-        "chưa có ma trận đo thời gian trước/sau index",
-        "Benchmark run #7 cho thấy median Q3 giảm từ 9,375 xuống 0,386 ms "
-        "ở MySQL và 35,723 xuống 0,409 ms ở MongoDB tại 100.000 đơn; tại "
-        "1.000.000 đơn, Q3 giảm từ 160,858 xuống 0,959 ms và 559,381 xuống "
-        "0,745 ms tương ứng. MongoDB Q2 giảm từ 584,627 xuống 0,524 ms ở "
-        "quy mô một triệu đơn. Q4 chậm hơn sau khi thêm index."
+        "Đề cương yêu cầu ma trận hai DBMS nhân với các cấu hình index",
+        "Trong phạm vi cấu hình đã thử, workload secondary index làm giảm "
+        "median latency của phần lớn truy vấn, nhưng mức cải thiện khác "
+        "nhau theo query và DBMS. Benchmark chỉ so sánh một bộ secondary "
+        "index với baseline; chưa tách riêng đóng góp của từng index đơn, "
+        "compound, covering hoặc multikey. Không có cơ sở kết luận DBMS "
+        "nào nhanh hơn một cách tổng quát."
     )
     replace_first(
         paragraphs,
-        "Không có bộ benchmark latency/throughput",
-        "Đã có kết quả định lượng baseline/indexed ở 100.000 và 1.000.000 đơn. "
-        "Tuy nhiên, chỉ một bộ workload secondary index được thử; chưa tách "
-        "riêng đóng góp của từng index đơn, compound, covering và multikey. "
-        "Không có cơ sở kết luận DBMS nào nhanh hơn một cách tổng quát."
+        "Vì chỉ có một mức pilot và không có số liệu latency theo quy mô",
+        "Đã benchmark hai quy mô 100.000 và 1.000.000 đơn. Không thể xem "
+        "chênh lệch latency giữa hai mức là phép đo scaling hoàn toàn "
+        "được kiểm soát vì CPU model của hai runner khác nhau. Mức "
+        "10.000.000 đơn chưa chạy do file thô ước lượng khoảng 7 GB, "
+        "chưa tính database files và index."
     )
     replace_first(
         paragraphs,
-        "Mức 100 nghìn trở lên chưa được chạy benchmark",
-        "Benchmark đã chạy ở 100.000 và 1.000.000 đơn. Mức 10.000.000 đơn "
-        "chưa chạy do file thô ước lượng khoảng 7 GB, chưa tính database "
-        "files và index. Hai quy mô chạy trên CPU model khác nhau nên không "
-        "thể dùng chênh lệch tuyệt đối để kết luận scaling."
-    )
-    replace_first(
-        paragraphs,
-        "Chỉ pilot 1.000 đơn được xác nhận",
-        "Benchmark latency được xác nhận ở hai quy mô 100.000 và 1.000.000 "
-        "đơn; chưa chạy 10.000.000 đơn do giới hạn dung lượng runner."
-    )
-    replace_first(
-        paragraphs,
-        "Tuy nhiên, câu hỏi về mức cải thiện thời gian truy vấn",
-        "Benchmark có kiểm soát ở 100.000 và 1.000.000 đơn cung cấp bằng "
-        "chứng định lượng về ảnh hưởng của workload secondary index. Index "
-        "cải thiện mạnh Q3 và MongoDB Q2, cải thiện Q5/Q6/Q8 ở các mức độ "
-        "khác nhau, nhưng Q4 chậm hơn và Q1/Q7 gần như không đổi. Chưa có "
-        "kết quả 10 triệu đơn nên không kết luận về giới hạn mở rộng ở quy mô đó."
+        "12.1. Kế hoạch đo bổ sung",
+        "12.2. Giới hạn diễn giải và kế hoạch tiếp theo"
     )
 
-    # Update the section heading and add the measured result table once.
-    for p in doc.paragraphs:
-        if "RQ5 VÀ RQ6: GIỚI HẠN BẰNG CHỨNG THỰC NGHIỆM" in p.text:
-            p.clear()
-            p.add_run("12. KẾT QUẢ BENCHMARK VÀ TRẢ LỜI RQ5–RQ6")
-        if "14. HẠN CHẾ, HƯỚNG PHÁT TRIỂN VÀ KẾT LUẬN" in p.text:
-            p.clear()
-            p.add_run("13. HẠN CHẾ, HƯỚNG PHÁT TRIỂN VÀ KẾT LUẬN")
+    # Remove the obsolete benchmark plan bullets and insert current limitations.
+    obsolete = (
+        "Tạo ba mức dữ liệu đã chốt",
+        "Mỗi mức chạy hai DBMS với cùng bộ tham số",
+        "Warm-up, chạy tối thiểu nhiều lần",
+        "Đo riêng read, write, import",
+        "Lưu explain, raw CSV"
+    )
+    for p in list(doc.paragraphs):
+        if any(p.text.strip().startswith(prefix) for prefix in obsolete):
+            p._element.getparent().remove(p._element)
 
-    all_text = "\n".join(p.text for p in doc.paragraphs)
-    if "Median latency baseline/indexed (ms)" not in all_text:
-        target = None
-        for p in doc.paragraphs:
-            if "RQ5. Có/không có Index" in p.text or "RQ5. Có/không có workload" in p.text:
-                target = p
-                break
-        if target is None:
-            target = doc.paragraphs[-1]
-        insert_benchmark_table(doc, target)
+    rq7_heading = next(
+        (p for p in doc.paragraphs if p.text.strip().startswith("13. RQ7")),
+        None
+    )
+    if rq7_heading:
+        insert_paragraph_before(
+            rq7_heading,
+            "sequential_ops_per_second trong summary là nghịch đảo mean latency "
+            "cho một client tuần tự, không phải throughput dưới tải đồng thời. "
+            "CI chưa thu CPU utilization, I/O throughput hoặc cache hit ratio "
+            "trong từng truy vấn."
+        )
+        insert_paragraph_before(
+            rq7_heading,
+            "p95/p99 và 30 mẫu latency được lưu trong raw/summary CSV của "
+            "artifact GitHub Actions run #7. Kết luận chính sử dụng median. "
+            "Muốn đánh giá production cần đo concurrency, tải hỗn hợp đọc/ghi, "
+            "cold-cache và nhiều lần lặp trên cùng phần cứng."
+        )
+        insert_paragraph_before(
+            rq7_heading,
+            "Các bước còn lại là chạy mức 10 triệu đơn trên máy đủ dung lượng, "
+            "tách riêng từng loại secondary index và đo thêm tài nguyên hệ thống."
+        )
+
+    # Correct numbering and update the limitations section.
+    replace_first(
+        paragraphs,
+        "13. HẠN CHẾ, HƯỚNG PHÁT TRIỂN VÀ KẾT LUẬN",
+        "14. HẠN CHẾ, HƯỚNG PHÁT TRIỂN VÀ KẾT LUẬN"
+    )
+    replace_first(
+        paragraphs,
+        "Môi trường kiểm thử là một máy Windows",
+        "Chưa thử sharding hoặc cụm nhiều máy; benchmark đọc được chạy trên "
+        "runner GitHub Actions riêng."
+    )
+    replace_first(
+        paragraphs,
+        "Không có đầy đủ log CPU, RAM, I/O, cache, concurrency",
+        "CI ghi nhận CPU model, số logical CPU, RAM tổng và cấu hình cache; "
+        "chưa thu CPU utilization, I/O và cache hit/miss theo từng truy vấn."
+    )
+    replace_first(
+        paragraphs,
+        "Các bản script vừa được chỉnh cần chạy nghiệm thu lại",
+        "CI tích hợp nghiệp vụ chạy trên fixture nhỏ; chưa thay thế kiểm thử "
+        "lại toàn bộ pilot trên máy nhóm."
+    )
+
+    # Refresh the future-work list.
+    replace_first(
+        paragraphs,
+        "Bổ sung harness benchmark chung cho MySQL và MongoDB",
+        "Chạy benchmark 10 triệu đơn trên máy/VM đủ dung lượng và RAM, giữ "
+        "phần cứng cố định giữa các quy mô."
+    )
+    replace_first(
+        paragraphs,
+        "Tách các mức index và kiểm soát index bắt buộc",
+        "Tách cấu hình index đơn, compound, covering và multikey để đánh giá "
+        "đóng góp riêng của từng index."
+    )
+    replace_first(
+        paragraphs,
+        "Đo warm/cold cache, concurrency, throughput",
+        "Đo warm/cold cache, concurrency, throughput và latency percentiles."
+    )
+    replace_first(
+        paragraphs,
+        "Chạy các mức dữ liệu theo khả năng tài nguyên",
+        "Thu thập CPU, RAM, I/O, cache hit/miss, chi phí import và dung lượng "
+        "database/index."
+    )
+
+    # Update appendix interpretation notes.
+    replace_first(
+        paragraphs,
+        "Mọi con số pilot trong báo cáo là kết quả kiểm thử chức năng",
+        "Số liệu pilot 1.000 đơn là kết quả kiểm thử chức năng. Số liệu "
+        "latency trong mục 12 lấy từ artifact benchmark GitHub Actions run #7, "
+        "gồm raw CSV, summary CSV, metadata phần cứng/phần mềm và index build "
+        "time. Mỗi truy vấn có 30 mẫu sau 5 lượt warm-up. CPU utilization, I/O "
+        "và cache hit/miss chưa được thu thập."
+    )
+    replace_first(
+        paragraphs,
+        "Báo cáo này là bản tổng hợp kỹ thuật trung thực theo bằng chứng hiện có",
+        "Benchmark chỉ áp dụng cho hai quy mô 100.000 và 1.000.000 đơn, hai "
+        "cấu hình index đã thử và môi trường CI được mô tả trong báo cáo. "
+        "Quy mô 10 triệu đơn chưa được benchmark."
+    )
+
+    # Verify the Word file contains exactly one complete benchmark table.
+    benchmark_tables = [
+        table for table in doc.tables
+        if len(table.columns) == 6
+        and len(table.rows) == 33
+        and table.rows[0].cells[3].text.strip() == "Baseline (ms)"
+        and table.rows[0].cells[4].text.strip() == "Indexed (ms)"
+    ]
+    if len(benchmark_tables) != 1:
+        raise SystemExit(
+            f"Expected exactly one 32-row benchmark table, found {len(benchmark_tables)}"
+        )
 
     doc.core_properties.comments = (
-        "Đồng bộ kết quả benchmark run #7 (100k/1M) với report Markdown; "
-        "10M chưa chạy và được nêu rõ là giới hạn."
+        "Word report synchronized with benchmark run #7; 100k and 1M measured, "
+        "10M explicitly not run."
     )
     doc.save(DOCX)
     print(f"Updated {DOCX}")
+    print("Verified benchmark table rows:", len(benchmark_tables[0].rows) - 1)
+
 
 if __name__ == "__main__":
     main()
