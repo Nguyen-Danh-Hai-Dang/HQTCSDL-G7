@@ -191,6 +191,9 @@ CALL W1_create_order(
 );
 ```
 
+W3 chỉ nhận số lượng dương và bảo đảm tổng tồn kho sau nhập không vượt
+2.147.483.647, tương ứng miền `INT` có dấu của cột `inventory.quantity`.
+
 Ví dụ W2 và W3:
 
 ```sql
@@ -239,7 +242,8 @@ W1_txn(100000001, 900000001, customer._id, inv.store_id, [
 ])
 ```
 
-W2 nhận order ID tường minh; W3 nhận store ID, product ID và số lượng tường minh:
+W2 nhận order ID tường minh; W3 nhận store ID, product ID và số lượng tường minh.
+W3 áp dụng cùng giới hạn tồn kho tối đa 2.147.483.647 như MySQL:
 
 ```javascript
 W2(100000001)
