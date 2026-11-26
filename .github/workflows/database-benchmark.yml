@@ -81,7 +81,7 @@ jobs:
       - name: Create MySQL schema and load CSV
         run: |
           mysql -h 127.0.0.1 -P 3306 -uroot -proot < 01_mysql_schema.sql
-          sed "s#C:/PATH/TO/PROJECT#$(pwd)#g" 08_load_mysql.sql > /tmp/load_mysql.sql
+          sed -e "s#C:/PATH/TO/PROJECT#$(pwd)#g" -e "s#data/s/mysql#data/${{ matrix.scale }}/mysql#g" 08_load_mysql.sql > /tmp/load_mysql.sql
           mysql --local-infile=1 -h 127.0.0.1 -P 3306 -uroot -proot < /tmp/load_mysql.sql
 
       - name: Load MongoDB Extended JSONL
