@@ -196,15 +196,17 @@ function W2(orderId) {
 
 // W3: nhập kho, báo lỗi nếu cặp cửa hàng/sản phẩm không tồn tại.
 function W3(storeId, productId, quantity) {
-  if (!Number.isSafeInteger(storeId) || storeId <= 0 ||
-      !Number.isSafeInteger(productId) || productId <= 0 ||
-      !Number.isSafeInteger(quantity) || quantity <= 0)
+  if (!Number.isSafeInteger(storeId) || storeId <= 0 || storeId > 65535 ||
+      !Number.isSafeInteger(productId) || productId <= 0 || productId > 4294967295 ||
+      !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 4294967295)
     throw new Error("INVALID_RESTOCK_ARGUMENTS");
   const result = db.inventory.updateOne(
-    { store_id: storeId, product_id: productId },
+    { store_id: storeId, product_id: productId,
+      quantity: { $lte: 4294967295 - quantity } },
     { $inc: { quantity } }
   );
-  if (result.matchedCount !== 1) throw new Error("INVENTORY_ROW_NOT_FOUND");
+  if (result.matchedCount !== 1)
+    throw new Error("INVENTORY_ROW_NOT_FOUND_OR_QUANTITY_OVERFLOW");
   return result;
 }
 
