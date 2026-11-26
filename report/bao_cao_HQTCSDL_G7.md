@@ -706,9 +706,9 @@ Các bước còn lại là chạy mức 10 triệu đơn trên máy có đủ d
 tách riêng từng loại secondary index và đo thêm tài nguyên hệ thống.
 Không ngoại suy kết quả 100 nghìn/1 triệu thành kết luận cho 10 triệu.
 
-# 13. HẠN CHẾ, HƯỚNG PHÁT TRIỂN VÀ KẾT LUẬN
+# 14. HẠN CHẾ, HƯỚNG PHÁT TRIỂN VÀ KẾT LUẬN
 
-## 13.1. Hạn chế
+## 14.1. Hạn chế
 
 - Benchmark latency đã được xác nhận ở hai quy mô 100.000 và 1.000.000
   đơn; chưa chạy 10.000.000 đơn do giới hạn dung lượng runner.
@@ -725,7 +725,7 @@ Không ngoại suy kết quả 100 nghìn/1 triệu thành kết luận cho 10 t
 - Các script nghiệp vụ đã qua CI tích hợp trên MySQL 8.4 và MongoDB 8.0
   replica set với fixture nhỏ; CI benchmark là một luồng kiểm thử riêng.
 
-## 13.2. Hướng phát triển
+## 14.2. Hướng phát triển
 
 1. Chạy benchmark 10 triệu đơn trên máy/VM có đủ dung lượng và RAM, giữ
    phần cứng cố định giữa các quy mô.
@@ -738,7 +738,7 @@ Không ngoại suy kết quả 100 nghìn/1 triệu thành kết luận cho 10 t
 6. Thử workload thực tế hơn, dữ liệu từ nhiều cửa hàng và các mẫu báo
    cáo mở rộng.
 
-## 13.3. Kết luận
+## 14.3. Kết luận
 
 Project đã hình thành được hai mô hình dữ liệu tương ứng, bộ sinh dữ
 liệu chung, workload Q1–Q8, các thao tác ghi W1–W3 và các index chính
