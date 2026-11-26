@@ -83,6 +83,7 @@ def insert_benchmark_table(doc, target):
         "Cardinality Q1–Q8 khớp giữa hai DBMS ở cả hai chế độ. Bảng dùng median "
         "latency (ms); số âm ở cột cuối nghĩa là latency tăng sau khi thêm index."
     )
+    insert_paragraph_before(target, "Median latency baseline/indexed (ms)", "Heading 2")
     table = doc.add_table(rows=1, cols=6)
     table.style = "Table Grid"
     headers = ["Quy mô", "DBMS", "Query", "Baseline (ms)", "Indexed (ms)", "Giảm latency"]
@@ -184,7 +185,7 @@ def main():
             p.add_run("13. HẠN CHẾ, HƯỚNG PHÁT TRIỂN VÀ KẾT LUẬN")
 
     all_text = "\n".join(p.text for p in doc.paragraphs)
-    if "Benchmark GitHub Actions run #7" not in all_text:
+    if "Median latency baseline/indexed (ms)" not in all_text:
         target = None
         for p in doc.paragraphs:
             if "RQ5. Có/không có Index" in p.text or "RQ5. Có/không có workload" in p.text:
