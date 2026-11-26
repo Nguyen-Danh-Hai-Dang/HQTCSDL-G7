@@ -167,10 +167,15 @@ Get-Content .\07_write_workload_mysql.sql -Raw | & "C:\Program Files\MySQL\MySQL
 W1 hiện nhận `p_lines` kiểu JSON và hỗ trợ từ 1 đến 50 sản phẩm khác nhau. Mỗi phần tử có dạng `{"pid": product_id, "qty": quantity}`; `pid` và `qty` phải là JSON integer dương, quantity tối đa 65.535. Trước khi gọi W1, tìm hai sản phẩm tại cùng cửa hàng và đủ tồn kho:
 
 ```sql
-SELECT a.store_id, a.product_id AS product_1, b.product_id AS product_2
+SELECT a.store_id, a.product_id, b.product_id
+INTO @w1_store_id, @w1_product_1, @w1_product_2
 FROM inventory a
 JOIN inventory b ON b.store_id = a.store_id AND b.product_id > a.product_id
 WHERE a.quantity >= 2 AND b.quantity >= 1
+LIMIT 1;
+
+SELECT customer_id INTO @w1_customer_id
+FROM customer
 LIMIT 1;
 ```
 
@@ -178,7 +183,7 @@ Dùng các ID vừa tìm được và customer_id đang tồn tại. Ví dụ d�
 
 ```sql
 CALL W1_create_order(
-  100000001, 900000001, 506, @w1_store_id,
+  100000001, 900000001, @w1_customer_id, @w1_store_id,
   JSON_ARRAY(
     JSON_OBJECT('pid', @w1_product_1, 'qty', 2),
     JSON_OBJECT('pid', @w1_product_2, 'qty', 1)
