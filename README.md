@@ -179,7 +179,7 @@ FROM customer
 LIMIT 1;
 ```
 
-Dùng các ID vừa tìm được và customer_id đang tồn tại. Ví dụ dưới đây dùng customer 506 trên pilot; hãy thay nếu dataset hiện tại không có ID này:
+Dùng các ID vừa tìm được và customer_id được chọn tự động từ bảng customer.
 
 ```sql
 CALL W1_create_order(
