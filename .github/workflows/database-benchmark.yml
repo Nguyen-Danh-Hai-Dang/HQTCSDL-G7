@@ -57,7 +57,7 @@ jobs:
 
       - name: Start MongoDB replica set
         run: |
-          docker run -d --name mongo-rs -p 27017:27017 mongo:8.0 mongod --replSet rs0 --bind_ip_all
+          docker run -d --name mongo-rs -p 27017:27017 mongo:8.0 mongod --replSet rs0 --bind_ip_all --wiredTigerCacheSizeGB 1
           for i in $(seq 1 60); do
             if docker exec mongo-rs mongosh --quiet --eval 'db.adminCommand("ping").ok' >/dev/null 2>&1; then
               break
@@ -73,7 +73,7 @@ jobs:
           done
 
       - name: Enable local CSV loading
-        run: mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "SET GLOBAL local_infile=1"
+        run: mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "SET GLOBAL local_infile=1; SET GLOBAL innodb_buffer_pool_size=1073741824"
 
       - name: Generate the shared dataset
         run: python 04_generate_data.py --scale "${{ matrix.scale }}" --seed 42 --out data
@@ -100,7 +100,7 @@ jobs:
           docker restart "$MYSQL_CONTAINER"
           docker restart mongo-rs
           for i in $(seq 1 60); do
-            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -proot >/dev/null 2>&1; then break; fi
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -proot >/dev/null 2>&1; then mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "SET GLOBAL innodb_buffer_pool_size=1073741824"; break; fi
             sleep 2
           done
           for i in $(seq 1 60); do
