@@ -14,6 +14,7 @@ jobs:
     services:
       mongodb:
         image: mongo:8.0
+        command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
         ports:
           - 27017:27017
         options: >-
