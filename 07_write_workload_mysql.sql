@@ -48,6 +48,11 @@ BEGIN
   END;
 
   -- Xác thực JSON trước khi ép kiểu bằng JSON_TABLE để tránh chuyển kiểu ngầm.
+  IF p_order_id = 0 OR p_payment_id = 0
+     OR p_order_id > 9007199254740991 OR p_payment_id > 9007199254740991 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'W1: order and payment IDs must be positive safe integers';
+  END IF;
+
   IF p_lines IS NULL OR JSON_TYPE(p_lines) <> 'ARRAY' THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'W1: lines must be a JSON array';
   END IF;
@@ -134,6 +139,10 @@ BEGIN
     )
   ) AS jt
   JOIN product p ON p.product_id = jt.product_id;
+
+  IF v_total > 999999999999.99 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'W1: payment total exceeds DECIMAL(14,2)';
+  END IF;
 
   INSERT INTO orders (order_id, customer_id, store_id, order_date, status)
   VALUES (p_order_id, p_customer_id, p_store_id, UTC_TIMESTAMP(), 'PENDING');
