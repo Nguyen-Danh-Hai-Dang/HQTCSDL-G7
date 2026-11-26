@@ -1,0 +1,76 @@
+name: Generator validation
+
+on:
+  push:
+    branches:
+      - fix/generator-w1-parity
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  mongodb-workload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Start MongoDB replica set
+        run: |
+          docker run -d --name mongo-rs -p 27017:27017 mongo:8.0 mongod --replSet rs0 --bind_ip_all
+          for i in $(seq 1 30); do
+            if docker exec mongo-rs mongosh --quiet --eval 'db.adminCommand("ping").ok' >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          docker exec mongo-rs mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]})'
+          docker exec mongo-rs mongosh --quiet --eval 'while (rs.status().myState !== 1) sleep(1000)'
+      - name: Create collections and validators
+        run: |
+          docker cp 03_mongodb_schema.js mongo-rs:/tmp/03_mongodb_schema.js
+          docker exec mongo-rs mongosh --quiet --file /tmp/03_mongodb_schema.js
+      - name: Run W1/W2/W3 integration assertions
+        run: |
+          docker cp 06_queries_mongodb.js mongo-rs:/tmp/06_queries_mongodb.js
+          docker cp tests/mongodb_workload_integration.js mongo-rs:/tmp/mongodb_workload_integration.js
+          docker exec mongo-rs mongosh --quiet --file /tmp/mongodb_workload_integration.js
+
+  mysql-workload:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+      - name: Create MySQL schema
+        run: mysql -h 127.0.0.1 -P 3306 -uroot -proot < 01_mysql_schema.sql
+      - name: Install write procedures
+        run: mysql -h 127.0.0.1 -P 3306 -uroot -proot shop_bench < 07_write_workload_mysql.sql
+      - name: Run W1/W3 integration assertions
+        run: mysql --show-warnings -h 127.0.0.1 -P 3306 -uroot -proot shop_bench < tests/mysql_workload_integration.sql
+
+  generator-pilot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run generator integrity test
+        run: python tests/test_generator_w1.py

@@ -477,6 +477,29 @@ collection độc lập.
 - Các thao tác ghi được thực hiện trên database test/clone, không làm
   thay đổi nguồn dữ liệu pilot gốc.
 
+## 9.2. Kiểm thử hồi quy tự động trên commit hiện tại
+
+GitHub Actions chạy ba job độc lập trên môi trường dùng một lần:
+
+- **Generator:** sinh pilot 1.000 đơn; kiểm tra từng order item có inventory
+  row tại đúng cửa hàng, không lặp product trong cùng đơn và CSV/JSONL
+  giống hệt nhau giữa hai lần chạy cùng seed/tham số.
+- **MySQL 8.4:** cài schema và stored procedures; W1 tạo đơn nhiều dòng,
+  kiểm tra tổng payment và tồn kho; một ca thiếu hàng xảy ra sau khi dòng
+  inventory đầu tiên đã cập nhật để xác nhận transaction rollback toàn
+  bộ; W3 kiểm tra nhập kho thành công và từ chối vượt giới hạn INT có dấu.
+- **MongoDB 8.0 replica set:** tạo collections/validators; W1 transaction
+  nhiều dòng và rollback khi thiếu hàng; W2 chuyển đơn/payment sang PAID;
+  W3 nhập kho thành công và từ chối tràn giới hạn INT32.
+
+Cả ba job đều PASS trên commit `8f42f2c` của nhánh
+`fix/generator-w1-parity`. Đây là kiểm thử tích hợp tự động trên fixture
+nhỏ, nhằm xác nhận cú pháp procedure, transaction và các nhánh nghiệp vụ
+quan trọng. Nó không thay thế kiểm thử lại trên toàn bộ pilot 1.000 đơn,
+không xác nhận Q1–Q8 trên commit mới và không phải benchmark latency/
+throughput. Các kết quả pilot lịch sử ở mục 9.1 được giữ riêng, không
+đánh đồng với fixture CI.
+
 # 10. EXECUTION PLAN VÀ DIỄN GIẢI
 
 ## 10.1. MySQL
@@ -668,8 +691,9 @@ thống nặng hơn.
 - Không có đầy đủ log CPU, RAM, I/O, cache, concurrency và số lần lặp
   cho phép so sánh hiệu năng thống kê.
 
-- Các bản script vừa được chỉnh cần chạy nghiệm thu lại trên máy nhóm
-  trước khi coi là bản phát hành ổn định.
+- Các script hiện tại đã qua CI tích hợp trên MySQL 8.4 và MongoDB 8.0
+  với fixture nhỏ; cần đối chiếu lại trên bộ pilot đầy đủ trước khi phát
+  hành và trước khi chạy benchmark.
 
 ## 14.2. Hướng phát triển
 
@@ -756,6 +780,10 @@ cập 24/11/2026).
 | 06_queries_mongodb.js       | Workload MongoDB Q1–Q8, W1–W3 và verifyLoad().       |
 | 07_write_workload_mysql.sql | Stored procedures W1–W3 có kiểm tra/rollback.        |
 | 08_load_mysql.sql           | Nạp CSV vào MySQL bằng LOAD DATA LOCAL INFILE.       |
+| tests/test_generator_w1.py   | Kiểm tra generator, inventory integrity và tính tái lập. |
+| tests/mysql_workload_integration.sql | Kiểm thử W1/W3 trên MySQL 8.4 bằng fixture CI. |
+| tests/mongodb_workload_integration.js | Kiểm thử W1/W2/W3 trên MongoDB replica set. |
+| .github/workflows/generator-validation.yml | Tự động chạy generator và integration tests trên CI. |
 
 ## PHỤ LỤC B. Quy ước diễn giải số liệu
 

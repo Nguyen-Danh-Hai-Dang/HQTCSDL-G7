@@ -6,7 +6,7 @@
 // =====================================================================
 use("shop_bench");
 
-const oid  = 123456, cid = 5439;
+const oid  = 8, cid = 506;
 const d1   = ISODate("2025-03-01T00:00:00Z"), d2   = ISODate("2025-04-01T00:00:00Z");
 const day1 = ISODate("2025-03-15T00:00:00Z"), day2 = ISODate("2025-03-22T00:00:00Z");
 const EXCL = ["CANCELLED", "RETURNED"];
@@ -121,8 +121,9 @@ function _validateW1Lines(lines) {
     throw new Error("INVALID_LINES: expected 1..50 order lines");
   const seen = new Set();
   for (const line of lines) {
-    if (!Number.isSafeInteger(line.pid) || line.pid <= 0 ||
-        !Number.isSafeInteger(line.qty) || line.qty <= 0)
+    if (!line || typeof line !== "object" ||
+        !Number.isSafeInteger(line.pid) || line.pid <= 0 || line.pid > 4294967295 ||
+        !Number.isSafeInteger(line.qty) || line.qty <= 0 || line.qty > 65535)
       throw new Error("INVALID_LINE: pid and qty must be positive safe integers");
     if (seen.has(line.pid)) throw new Error("DUPLICATE_PRODUCT: combine quantities first");
     seen.add(line.pid);
@@ -132,8 +133,8 @@ function _W1_body(sdb, newOid, payId, customerId, storeId, lines) {
   _validateW1Lines(lines);
   if (!Number.isSafeInteger(newOid) || newOid <= 0 ||
       !Number.isSafeInteger(payId) || payId <= 0 ||
-      !Number.isSafeInteger(customerId) || customerId <= 0 ||
-      !Number.isSafeInteger(storeId) || storeId <= 0)
+      !Number.isSafeInteger(customerId) || customerId <= 0 || customerId > 4294967295 ||
+      !Number.isSafeInteger(storeId) || storeId <= 0 || storeId > 65535)
     throw new Error("INVALID_IDENTIFIER");
   if (!sdb.customers.findOne({ _id: customerId })) throw new Error("CUSTOMER_NOT_FOUND");
   if (!sdb.stores.findOne({ _id: storeId })) throw new Error("STORE_NOT_FOUND");
@@ -148,13 +149,15 @@ function _W1_body(sdb, newOid, payId, customerId, storeId, lines) {
     return { line_no: index + 1, product_id: line.pid,
              quantity: line.qty, unit_price: price };
   });
+  if (total > 99999999999999n) throw new Error("PAYMENT_AMOUNT_OUT_OF_RANGE");
   sdb.orders.insertOne({
     _id: newOid, customer_id: customerId, store_id: storeId,
     order_date: new Date(), status: "PENDING", items,
     payments: [{ payment_id: payId, method: "CARD",
       amount: NumberDecimal(_centsToDecimal(total)), paid_at: null, status: "PENDING" }]
   });
-  for (const line of lines) {
+  const inventoryLines = [...lines].sort((a, b) => a.pid - b.pid);
+  for (const line of inventoryLines) {
     const result = sdb.inventory.updateOne(
       { store_id: storeId, product_id: line.pid, quantity: { $gte: line.qty } },
       { $inc: { quantity: -line.qty } }
@@ -178,9 +181,11 @@ function W1_txn(newOid, payId, customerId, storeId, lines) {
 }
 
 // W2: chỉ cập nhật khi đơn PENDING và tồn tại ít nhất một payment PENDING.
-function W2() {
+function W2(orderId) {
+  if (!Number.isSafeInteger(orderId) || orderId <= 0)
+    throw new Error("INVALID_ORDER_ID");
   const result = db.orders.updateOne(
-    { _id: oid, status: "PENDING", payments: { $elemMatch: { status: "PENDING" } } },
+    { _id: orderId, status: "PENDING", payments: { $elemMatch: { status: "PENDING" } } },
     { $set: { status: "PAID", "payments.$[p].status": "PAID",
               "payments.$[p].paid_at": new Date() } },
     { arrayFilters: [{ "p.status": "PENDING" }] }
@@ -190,16 +195,18 @@ function W2() {
 }
 
 // W3: nhập kho, báo lỗi nếu cặp cửa hàng/sản phẩm không tồn tại.
-function W3(storeId = 7, productId = 5, quantity = 50) {
-  if (!Number.isSafeInteger(storeId) || storeId <= 0 ||
-      !Number.isSafeInteger(productId) || productId <= 0 ||
-      !Number.isSafeInteger(quantity) || quantity <= 0)
+function W3(storeId, productId, quantity) {
+  if (!Number.isSafeInteger(storeId) || storeId <= 0 || storeId > 65535 ||
+      !Number.isSafeInteger(productId) || productId <= 0 || productId > 4294967295 ||
+      !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 2147483647)
     throw new Error("INVALID_RESTOCK_ARGUMENTS");
   const result = db.inventory.updateOne(
-    { store_id: storeId, product_id: productId },
+    { store_id: storeId, product_id: productId,
+      quantity: { $lte: 2147483647 - quantity } },
     { $inc: { quantity } }
   );
-  if (result.matchedCount !== 1) throw new Error("INVENTORY_ROW_NOT_FOUND");
+  if (result.matchedCount !== 1)
+    throw new Error("INVENTORY_ROW_NOT_FOUND_OR_INT32_OVERFLOW");
   return result;
 }
 

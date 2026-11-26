@@ -51,7 +51,7 @@ db.createCollection("stores", { validator: { $jsonSchema: {
 db.createCollection("inventory", { validator: { $jsonSchema: {
   bsonType: "object", required: ["_id", "store_id", "product_id", "quantity"],
   properties: { _id: ID, store_id: ID, product_id: ID,
-                quantity: { bsonType: ["int", "long"], minimum: 0 } } } } });
+                quantity: { bsonType: ["int", "long"], minimum: 0, maximum: 2147483647 } } } } });
 
 db.createCollection("orders", { validator: { $jsonSchema: {
   bsonType: "object",
