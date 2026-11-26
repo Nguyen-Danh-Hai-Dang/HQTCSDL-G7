@@ -76,7 +76,7 @@ MONGO_PIPELINES = {
                                      "$lt": datetime(2026,1,1,tzinfo=timezone.utc)},
                     "status": {"$nin": EXCLUDED}}},
         {"$group": {"_id": {"$dateToString": {"format": "%Y-%m", "date": "$order_date"}},
-                    "orders": {"$sum": 1}, "revenue": ORDER_TOTAL}},
+                    "orders": {"$sum": 1}, "revenue": {"$sum": ORDER_TOTAL}}},
         {"$sort": {"_id": 1}},
     ],
     "Q5": [
@@ -122,7 +122,7 @@ MONGO_PIPELINES = {
         {"$match": {"order_date": {"$gte": datetime(2025,3,1,tzinfo=timezone.utc),
                                      "$lt": datetime(2025,4,1,tzinfo=timezone.utc)},
                     "status": {"$nin": EXCLUDED}}},
-        {"$group": {"_id": "$customer_id", "spend": ORDER_TOTAL}},
+        {"$group": {"_id": "$customer_id", "spend": {"$sum": ORDER_TOTAL}}},
         {"$sort": {"spend": -1, "_id": 1}}, {"$limit": 10},
         {"$lookup": {"from": "customers", "localField": "_id", "foreignField": "_id", "as": "cu"}},
         {"$unwind": "$cu"},
