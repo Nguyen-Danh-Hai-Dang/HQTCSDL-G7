@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   benchmark:
-    name: Benchmark \${{ matrix.scale }} dataset
+    name: Benchmark ${{ matrix.scale }} dataset
     runs-on: ubuntu-latest
     timeout-minutes: 360
     strategy:
@@ -76,7 +76,7 @@ jobs:
         run: mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "SET GLOBAL local_infile=1"
 
       - name: Generate the shared dataset
-        run: python 04_generate_data.py --scale "\${{ matrix.scale }}" --seed 42 --out data
+        run: python 04_generate_data.py --scale "${{ matrix.scale }}" --seed 42 --out data
 
       - name: Create MySQL schema and load CSV
         run: |
@@ -85,13 +85,13 @@ jobs:
           mysql --local-infile=1 -h 127.0.0.1 -P 3306 -uroot -proot < /tmp/load_mysql.sql
 
       - name: Load MongoDB Extended JSONL
-        run: python benchmark/run_benchmark.py --scale "\${{ matrix.scale }}" --load-mongo --data-dir "data/\${{ matrix.scale }}" --out "benchmark/results/\${{ matrix.scale }}"
+        run: python benchmark/run_benchmark.py --scale "${{ matrix.scale }}" --load-mongo --data-dir "data/${{ matrix.scale }}" --out "benchmark/results/${{ matrix.scale }}"
 
       - name: Run baseline benchmark
-        run: python benchmark/run_benchmark.py --scale "\${{ matrix.scale }}" --mode baseline --out "benchmark/results/\${{ matrix.scale }}"
+        run: python benchmark/run_benchmark.py --scale "${{ matrix.scale }}" --mode baseline --out "benchmark/results/${{ matrix.scale }}"
 
       - name: Build workload indexes
-        run: python benchmark/run_benchmark.py --scale "\${{ matrix.scale }}" --build-indexes --out "benchmark/results/\${{ matrix.scale }}"
+        run: python benchmark/run_benchmark.py --scale "${{ matrix.scale }}" --build-indexes --out "benchmark/results/${{ matrix.scale }}"
 
       - name: Restart databases to clear process caches
         run: |
@@ -109,12 +109,12 @@ jobs:
           done
 
       - name: Run indexed benchmark
-        run: python benchmark/run_benchmark.py --scale "\${{ matrix.scale }}" --mode indexed --out "benchmark/results/\${{ matrix.scale }}"
+        run: python benchmark/run_benchmark.py --scale "${{ matrix.scale }}" --mode indexed --out "benchmark/results/${{ matrix.scale }}"
 
       - name: Upload raw and summarized results
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-\${{ matrix.scale }}
-          path: benchmark/results/\${{ matrix.scale }}/
+          name: benchmark-${{ matrix.scale }}
+          path: benchmark/results/${{ matrix.scale }}/
           if-no-files-found: error
           retention-days: 30
