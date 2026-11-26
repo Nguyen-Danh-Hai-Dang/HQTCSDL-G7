@@ -39,6 +39,13 @@ Dữ liệu là **dữ liệu tổng hợp**, không phải giao dịch của c�
 ├── report/
 │   ├── bao_cao_HQTCSDL_G7.docx
 │   └── bao_cao_HQTCSDL_G7.md
+├── tests/
+│   ├── test_generator_w1.py
+│   ├── mysql_workload_integration.sql
+│   └── mongodb_workload_integration.js
+├── .github/
+│   └── workflows/
+│       └── generator-validation.yml
 ├── .gitignore
 └── README.md
 ```
