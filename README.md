@@ -164,7 +164,7 @@ Nạp procedure:
 Get-Content .\07_write_workload_mysql.sql -Raw | & "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" -u root -p shop_bench
 ```
 
-W1 hiện nhận `p_lines` kiểu JSON và hỗ trợ từ 1 đến 50 sản phẩm khác nhau. Mỗi phần tử có dạng `{"pid": product_id, "qty": quantity}`; `pid` và `qty` phải là JSON integer dương, quantity tối đa 65.535. Trước khi gọi W1, tìm hai sản phẩm tại cùng cửa hàng và đủ tồn kho:
+W1 hiện nhận `p_lines` kiểu JSON và hỗ trợ từ 1 đến 50 sản phẩm khác nhau. Mỗi phần tử có dạng `{"pid": product_id, "qty": quantity}`; `pid` và `qty` phải là JSON integer dương, quantity tối đa 65.535. W1 và W2 tự quản lý transaction; không gọi chúng bên trong một transaction khác của caller vì `START TRANSACTION` trong MySQL sẽ kết thúc transaction đang mở trước đó. Trước khi gọi W1, tìm hai sản phẩm tại cùng cửa hàng và đủ tồn kho:
 
 ```sql
 SELECT a.store_id, a.product_id, b.product_id
