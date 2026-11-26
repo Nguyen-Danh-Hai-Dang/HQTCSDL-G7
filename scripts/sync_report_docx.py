@@ -124,18 +124,30 @@ def main():
 
     doc = Document(DOCX)
 
-    # Remove the earlier text-only duplicate; retain the section that contains the table.
-    headings = [
-        p for p in doc.paragraphs
-        if p.text.strip() == "12. KẾT QUẢ BENCHMARK VÀ TRẢ LỜI RQ5–RQ6"
+    # Remove earlier duplicate benchmark sections and any duplicate benchmark table.
+    heading_text = "12. KẾT QUẢ BENCHMARK VÀ TRẢ LỜI RQ5–RQ6"
+    seen = 0
+    remove_first_block = False
+    for p in list(doc.paragraphs):
+        if p.text.strip() == heading_text:
+            seen += 1
+            if seen == 1:
+                remove_first_block = True
+                p._element.getparent().remove(p._element)
+            elif seen == 2:
+                remove_first_block = False
+        elif remove_first_block:
+            p._element.getparent().remove(p._element)
+
+    matching_tables = [
+        table for table in doc.tables
+        if len(table.columns) == 6
+        and len(table.rows) == 33
+        and table.rows[0].cells[3].text.strip() == "Baseline (ms)"
+        and table.rows[0].cells[4].text.strip() == "Indexed (ms)"
     ]
-    if len(headings) > 1:
-        body = doc._element.body
-        elements = list(body)
-        first_index = next(i for i, element in enumerate(elements) if element is headings[0]._p)
-        second_index = next(i for i, element in enumerate(elements) if element is headings[1]._p)
-        for element in elements[first_index:second_index]:
-            body.remove(element)
+    for duplicate in matching_tables[:-1]:
+        duplicate._tbl.getparent().remove(duplicate._tbl)
 
     paragraphs = list(doc.paragraphs)
 
