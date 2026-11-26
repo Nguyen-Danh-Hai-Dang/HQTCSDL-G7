@@ -124,6 +124,10 @@ def main():
 
     doc = Document(DOCX)
     paragraphs = list(doc.paragraphs)
+    print("DOCX_PARAGRAPHS_BEGIN")
+    for i, paragraph in enumerate(paragraphs):
+        print(f"P{i}: {paragraph.text}")
+    print("DOCX_TABLE_COUNT", len(doc.tables))
 
     # Refresh the abstract and existing RQ conclusions.
     replace_first(
