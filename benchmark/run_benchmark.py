@@ -231,6 +231,8 @@ def mongo_run(db, name):
 
 def system_info(mysql_conn, mongo_db, scale, mode):
     cur = mysql_conn.cursor()
+    cur.execute("ANALYZE TABLE category, customer, product, store, inventory, orders, order_item, payment")
+    cur.fetchall()
     cur.execute("SELECT VERSION()")
     mysql_version = cur.fetchone()[0]
     cur.execute("SHOW VARIABLES LIKE 'innodb_buffer_pool_size'")
