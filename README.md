@@ -288,7 +288,10 @@ Theo log kiểm thử cục bộ do nhóm ghi nhận:
 - W1 thành công đã được kiểm tra trên cả hai hệ.
 - MySQL W1 đã được kiểm tra rollback khi số lượng vượt miền dữ liệu và khi tồn kho không đủ; order/payment/item không còn sau rollback.
 - W2 và W3 đã được kiểm tra ở luồng thành công.
-- Các thay đổi mới trong `07_write_workload_mysql.sql`, `03_mongodb_schema.js` và `06_queries_mongodb.js` đã qua rà soát tĩnh; cần chạy lại kiểm thử runtime trên commit hiện tại trước khi nghiệm thu cuối.
+- CI trên MySQL 8.4 đã cài procedure và kiểm thử W1 nhiều dòng thành công, tổng payment/tồn kho đúng, rollback toàn bộ khi thiếu hàng xảy ra sau một cập nhật tồn kho trước đó, W3 nhập kho thành công và từ chối tràn giới hạn INT.
+- CI trên MongoDB 8.0 replica set đã kiểm thử W1 transaction nhiều dòng và rollback, W2 chuyển trạng thái đơn/payment, W3 nhập kho và từ chối tràn giới hạn INT.
+- CI generator kiểm tra 1.000 đơn, mọi order item có inventory row tại cửa hàng tương ứng, không trùng sản phẩm trong một đơn và CSV/JSONL tái lập byte-level.
+- Đây là kiểm thử tích hợp tự động trên fixture nhỏ, không phải kiểm thử toàn bộ pilot hoặc benchmark hiệu năng. Các kết quả kiểm thử cục bộ lịch sử ở trên vẫn được phân biệt với kết quả CI của commit hiện tại.
 - Execution Plan Q1 MySQL dùng PRIMARY; Q2 MySQL dùng `idx_orders_customer_date`. MongoDB Q1 dùng `_id_`; Q2 dùng index khách hàng/ngày.
 - Đây là **kiểm thử chức năng và kiểm tra execution plan trên pilot**, không phải benchmark thời gian đủ điều kiện để kết luận hệ nào nhanh hơn.
 
