@@ -317,7 +317,7 @@ Repository có harness benchmark chung tại `benchmark/run_benchmark.py` và wo
 
 | Quy mô | Đơn hàng | Kết quả |
 |---|---:|---|
-| `s` | 100.000 | <badge color="success">PASS</badge> |
+| `s` | 100.000 | **PASS** |
 | `m` | 1.000.000 | <badge color="success">PASS</badge> |
 | `l` | 10.000.000 | Chưa chạy |
 
