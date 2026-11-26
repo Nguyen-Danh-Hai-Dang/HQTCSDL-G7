@@ -233,6 +233,8 @@ def system_info(mysql_conn, mongo_db, scale, mode):
     cur = mysql_conn.cursor()
     cur.execute("SELECT VERSION()")
     mysql_version = cur.fetchone()[0]
+    cur.execute("SHOW VARIABLES LIKE 'innodb_buffer_pool_size'")
+    mysql_buffer_pool = int(cur.fetchone()[1])
     cur.execute("""SELECT COALESCE(SUM(data_length+index_length),0),
                           COALESCE(SUM(data_length),0),COALESCE(SUM(index_length),0)
                    FROM information_schema.tables WHERE table_schema='shop_bench'""")
@@ -240,6 +242,8 @@ def system_info(mysql_conn, mongo_db, scale, mode):
     cur.close()
     stats = mongo_db.command("dbStats")
     build = mongo_db.command("buildInfo")
+    server_status = mongo_db.command("serverStatus")
+    wt_cache = server_status.get("wiredTiger", {}).get("cache", {})
     cpu = "unknown"
     try:
         for line in Path("/proc/cpuinfo").read_text().splitlines():
@@ -262,11 +266,25 @@ def system_info(mysql_conn, mongo_db, scale, mode):
         "memory_total": mem, "python": platform.python_version(),
         "mysql_version": mysql_version, "mongodb_version": build["version"],
         "mysql_total_bytes": int(mysql_sizes[0]), "mysql_data_bytes": int(mysql_sizes[1]),
-        "mysql_index_bytes": int(mysql_sizes[2]), "mongodb_storage_bytes": int(stats.get("storageSize",0)),
+        "mysql_index_bytes": int(mysql_sizes[2]), "mysql_innodb_buffer_pool_bytes": mysql_buffer_pool,
+        "mongodb_data_bytes": int(stats.get("dataSize",0)),
+        "mongodb_storage_bytes": int(stats.get("storageSize",0)),
         "mongodb_index_bytes": int(stats.get("indexSize",0)),
+        "mongodb_objects": int(stats.get("objects",0)),
+        "mongodb_collections": int(stats.get("collections",0)),
+        "mongodb_wiredtiger_cache_max_bytes": int(wt_cache.get("maximum bytes configured",0)),
         "warmups": WARMUPS, "measured_iterations": REPEATS, "concurrency": 1,
         "cache_policy": "warm cache after 5 warm-up executions; single client",
     }
+
+def logical_result_count(database, query, result):
+    if query == "Q1":
+        if database == "mysql":
+            return sum(len(part) for part in result)
+        if not result:
+            return 0
+        return 1 + len(result.get("items", [])) + len(result.get("payments", []))
+    return len(result) if result is not None else 0
 
 def run_benchmark(scale, mode, out_dir):
     out = Path(out_dir)
@@ -297,7 +315,7 @@ def run_benchmark(scale, mode, out_dir):
                 samples.append(elapsed)
                 raw_rows.append({"scale":scale,"mode":mode,"database":db_name,
                     "query":query,"iteration":iteration,"latency_ms":f"{elapsed:.6f}",
-                    "result_count":len(result) if result is not None else 0})
+                    "result_count":logical_result_count(db_name, query, result)})
             summary_rows.append({"scale":scale,"mode":mode,"database":db_name,"query":query,
                 "iterations":len(samples),"mean_ms":f"{statistics.mean(samples):.6f}",
                 "median_ms":f"{statistics.median(samples):.6f}",
@@ -306,6 +324,16 @@ def run_benchmark(scale, mode, out_dir):
                 "min_ms":f"{min(samples):.6f}","max_ms":f"{max(samples):.6f}",
                 "sequential_ops_per_second":f"{1000/statistics.mean(samples):.3f}"})
             print(f"{scale} {mode} {db_name} {query}: median={statistics.median(samples):.3f}ms p95={percentile(samples,.95):.3f}ms")
+    # Cardinality parity check: all Q1-Q8 logical result counts must agree.
+    for query in ["Q1","Q2","Q3","Q4","Q5","Q6","Q7","Q8"]:
+        counts = {
+            db_name: {row["result_count"] for row in raw_rows
+                      if row["database"] == db_name and row["query"] == query}
+            for db_name in ["mysql","mongodb"]
+        }
+        if counts["mysql"] != counts["mongodb"]:
+            raise RuntimeError("Result cardinality mismatch for " + query + ": " + str(counts))
+
     with raw_path.open("w",newline="",encoding="utf-8") as f:
         w=csv.DictWriter(f,fieldnames=list(raw_rows[0].keys())); w.writeheader(); w.writerows(raw_rows)
     with summary_path.open("w",newline="",encoding="utf-8") as f:
