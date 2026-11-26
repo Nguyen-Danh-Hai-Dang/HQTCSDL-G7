@@ -244,7 +244,7 @@ BEGIN
     WHERE store_id = p_store_id AND product_id = p_product_id
       AND quantity <= 2147483647 - p_quantity;
   IF ROW_COUNT() <> 1 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'W3: inventory row not found';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'W3: inventory row not found or INT overflow';
   END IF;
 END$$
 DELIMITER ;
