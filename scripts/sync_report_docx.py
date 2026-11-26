@@ -131,8 +131,8 @@ def main():
     ]
     if len(headings) > 1:
         paragraphs = list(doc.paragraphs)
-        first_index = paragraphs.index(headings[0])
-        second_index = paragraphs.index(headings[1])
+        first_index = next(i for i, p in enumerate(paragraphs) if p._p is headings[0]._p)
+        second_index = next(i for i, p in enumerate(paragraphs) if p._p is headings[1]._p)
         for p in paragraphs[first_index:second_index]:
             p._element.getparent().remove(p._element)
 
