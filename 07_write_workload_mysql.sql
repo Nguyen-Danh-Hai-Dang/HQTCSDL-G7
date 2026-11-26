@@ -195,7 +195,7 @@ BEGIN
 
   COMMIT;
   SET v_transaction_started = FALSE;
-END$
+END$$
 
 CREATE PROCEDURE W2_mark_paid(IN p_order_id BIGINT UNSIGNED)
 BEGIN
