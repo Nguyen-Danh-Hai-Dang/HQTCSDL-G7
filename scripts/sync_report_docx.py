@@ -74,7 +74,7 @@ def main():
             )
             insert_paragraph_before(
                 target,
-                "GitHub Actions run #38 (27/11/2026 theo UTC của hệ thống CI) chạy trên "
+                "GitHub Actions run #38 (26/11/2026 theo UTC của hệ thống CI) chạy trên "
                 "PR head commit 32b123b1a660e8cd90f4c1e2f0b7abcc5a8c7f4b. PR #1 đã "
                 "được merge vào main bằng merge commit ef47d88dc29bbcb6738868e1ad1bd861b6939d27."
             )
