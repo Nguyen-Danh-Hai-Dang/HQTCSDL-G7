@@ -38,19 +38,21 @@ MySQL 8.4 và MongoDB 8.0 replica set. Các job này xác nhận những nhánh
 nghiệp vụ trọng yếu trên fixture nhỏ, không thay thế benchmark hoặc
 kiểm thử lại toàn bộ pilot.
 
-Thực nghiệm pilot 1.000 đơn được dùng để xác nhận chức năng, không dùng
-để kết luận hiệu năng ở quy mô lớn. Pilot ghi nhận 1.000 đơn, 2.705 dòng
-chi tiết, 1.042 thanh toán, 20.000 dòng tồn kho và doanh thu gộp
-601.330,15. Q1–Q8 đã được đối chiếu kết quả nghiệp vụ giữa hai hệ trong
-các lần kiểm thử cục bộ trước đó. Chưa có bộ số liệu latency/throughput
-được đo lặp có kiểm soát, cũng chưa chạy các mức 100 nghìn, 1 triệu và
-10 triệu đơn trong điều kiện benchmark.
+Thực nghiệm pilot 1.000 đơn được dùng để xác nhận chức năng; benchmark
+được chạy bổ sung trên hai quy mô 100.000 và 1.000.000 đơn bằng GitHub
+Actions. Mỗi truy vấn Q1–Q8 có 5 lượt warm-up và 30 lượt đo, chạy tuần tự
+với một client. MySQL 8.4.13 và MongoDB 8.0.38 được giới hạn cache 1 GiB
+mỗi hệ; runner có 4 logical CPU và khoảng 16 GB RAM. Kết quả cho thấy
+secondary index cải thiện mạnh một số truy vấn, đặc biệt Q3 và MongoDB
+Q2, nhưng Q4 không cải thiện và Q7 gần như không đổi. Bộ dữ liệu 10 triệu
+đơn chưa được benchmark vì ước lượng file dữ liệu thô khoảng 7 GB, chưa
+tính dung lượng hai CSDL và index.
 
-Vì vậy, báo cáo trả lời đầy đủ khía cạnh lý thuyết và thiết kế cho
-RQ1–RQ4, nhưng giới hạn kết luận thực nghiệm đối với RQ4–RQ6. Các khuyến
-nghị ở RQ7 được trình bày có điều kiện, dựa trên đặc điểm workload,
-index và execution plan quan sát được, không khẳng định hệ nào nhanh hơn
-trong mọi trường hợp.
+Vì vậy, RQ4 và RQ5 đã có bằng chứng định lượng ở hai quy mô; RQ6 mới có
+kết quả ở 100 nghìn và 1 triệu đơn, chưa đủ để kết luận xu hướng ở 10
+triệu đơn. Các khuyến nghị RQ7 vẫn phụ thuộc workload, mô hình dữ liệu,
+index và tài nguyên triển khai, không khẳng định hệ nào nhanh hơn trong
+mọi trường hợp.
 
 Từ khóa: MySQL, MongoDB, InnoDB, WiredTiger, Index, B-Tree, compound
 index, multikey index, execution plan, workload bán hàng.
@@ -583,156 +585,173 @@ compound và multikey.
 
 ## RQ4. Index ảnh hưởng thời gian truy vấn như thế nào?
 
-Về cơ chế, index phù hợp có thể giảm rows/docs examined và loại bỏ sort
-hoặc lookup bổ sung. Execution plan pilot xác nhận Q1/Q2 sử dụng index.
-Tuy nhiên, chưa có ma trận đo thời gian trước/sau index với nhiều lần
-lặp, cũng chưa có số liệu p95/p99 hoặc throughput. Do đó, kết luận hiện
-tại là có bằng chứng về việc optimizer sử dụng index, chưa đủ bằng chứng
-định lượng mức giảm thời gian.
+Benchmark run #7 đo latency trước và sau khi bổ sung workload secondary
+index ở cả hai hệ. Ở quy mô 100.000 đơn, median Q3 giảm từ 9,375 xuống
+0,386 ms ở MySQL và từ 35,723 xuống 0,409 ms ở MongoDB. Ở quy mô
+1.000.000 đơn, Q3 giảm từ 160,858 xuống 0,959 ms ở MySQL và từ 559,381
+xuống 0,745 ms ở MongoDB. MongoDB Q2 giảm từ 584,627 xuống 0,524 ms ở
+quy mô một triệu đơn. Ngược lại, Q4 chậm hơn khoảng 2,2–10,9% tuỳ DBMS
+và quy mô; Q7 thay đổi rất nhỏ. Kết quả xác nhận index có tác động phụ
+thuộc truy vấn, không phải mọi truy vấn đều nhanh hơn.
 
-# 12. RQ5 VÀ RQ6: GIỚI HẠN BẰNG CHỨNG THỰC NGHIỆM
+# 12. KẾT QUẢ BENCHMARK VÀ TRẢ LỜI RQ5–RQ6
 
-## RQ5. Có/không có Index trong cùng workload và quy mô
+## 12.1. Phương pháp và môi trường đo
 
-Đề cương yêu cầu ma trận hai DBMS nhân với các cấu hình index (chỉ
-PK/\_id, index đơn, compound/covering), cùng dữ liệu logic, phần cứng,
-cấu hình bộ nhớ và công cụ đo. Chỉ số cần thu thập gồm latency trung
-bình, median, p95, p99, throughput, CPU/RAM/I/O, kích thước index và
-thời gian tạo index.
+Benchmark được chạy trong GitHub Actions run #7, commit
+d3e52159, trên hai quy mô generator: s (100.000 đơn) và m
+(1.000.000 đơn). Mỗi quy mô chạy trên runner Ubuntu riêng, 4 logical
+CPU, khoảng 16 GB RAM; CPU lần lượt là AMD EPYC 9V45 và AMD EPYC 7763.
+Phiên bản phần mềm: Python 3.12.16, MySQL 8.4.13 và MongoDB 8.0.38.
+InnoDB buffer pool và WiredTiger cache đều được đặt ở 1 GiB. Mỗi truy
+vấn chạy 5 lượt warm-up và 30 lượt đo, concurrency = 1, một client tuần
+tự. Database được restart trước lượt indexed; sau đó warm-up lại.
 
-Bộ script hiện có một cấu hình secondary index phục vụ workload. Nó chưa
-tách thành đầy đủ các cấp độ no-secondary-index, single, compound và
-covering cho từng truy vấn. Không có bộ benchmark latency/throughput
-được xác minh, do đó RQ5 chưa thể kết luận MySQL hay MongoDB nhanh hơn,
-hoặc index giúp bao nhiêu phần trăm. Kết quả pilot chỉ xác nhận tính
-đúng đắn và đường truy cập index.
+Hai chế độ được so sánh là baseline (không có workload secondary index,
+nhưng vẫn giữ các index bắt buộc của schema/constraint) và indexed
+(thêm bộ workload secondary index). Kết quả cardinality của Q1–Q8 khớp
+giữa MySQL và MongoDB ở mọi lần đo thuộc cả hai chế độ. Đây là kiểm tra
+số lượng kết quả, không phải phép so sánh từng giá trị trong result set.
 
-## RQ6. Khi quy mô dữ liệu tăng
+Raw CSV, summary CSV, metadata và thời gian tạo index được lưu trong
+artifact benchmark-s và benchmark-m của
+[GitHub Actions run #7](https://github.com/Nguyen-Danh-Hai-Dang/HQTCSDL-G7/actions/runs/45774155670).
+Bảng dưới đây dùng median latency (ms); phần trăm thể hiện mức giảm
+latency khi thêm index. Số âm nghĩa là latency tăng.
 
-Đề cương đề xuất các mức 100 nghìn, 1 triệu và 10 triệu đơn, điều chỉnh
-theo phần cứng. Cần đo xu hướng latency, index size, cache hit/miss,
-I/O, chi phí import và tạo index; đồng thời xác định điểm chuyển khi dữ
-liệu/index vượt khả năng cache. Nhóm mới chạy pilot 1.000 đơn để kiểm
-tra chức năng. Mức 100 nghìn trở lên chưa được chạy benchmark do giới
-hạn tài nguyên máy tại thời điểm thực hiện.
+| Quy mô | DBMS | Query | Baseline (ms) | Indexed (ms) | Giảm latency |
+|---|---|---|---:|---:|---:|
+| 100k | MySQL | Q1 | 0,441 | 0,437 | 0,9% |
+| 100k | MySQL | Q2 | 0,223 | 0,181 | 18,8% |
+| 100k | MySQL | Q3 | 9,375 | 0,386 | 95,9% |
+| 100k | MySQL | Q4 | 183,546 | 187,660 | -2,2% |
+| 100k | MySQL | Q5 | 22,922 | 16,497 | 28,0% |
+| 100k | MySQL | Q6 | 27,562 | 21,407 | 22,3% |
+| 100k | MySQL | Q7 | 0,213 | 0,244 | -14,7% |
+| 100k | MySQL | Q8 | 19,922 | 12,838 | 35,6% |
+| 100k | MongoDB | Q1 | 0,157 | 0,152 | 3,1% |
+| 100k | MongoDB | Q2 | 31,187 | 0,243 | 99,2% |
+| 100k | MongoDB | Q3 | 35,723 | 0,409 | 98,9% |
+| 100k | MongoDB | Q4 | 295,364 | 327,647 | -10,9% |
+| 100k | MongoDB | Q5 | 55,405 | 14,307 | 74,2% |
+| 100k | MongoDB | Q6 | 80,595 | 40,301 | 50,0% |
+| 100k | MongoDB | Q7 | 0,531 | 0,530 | 0,3% |
+| 100k | MongoDB | Q8 | 51,788 | 14,463 | 72,1% |
+| 1M | MySQL | Q1 | 1,060 | 0,987 | 6,8% |
+| 1M | MySQL | Q2 | 0,490 | 0,447 | 8,7% |
+| 1M | MySQL | Q3 | 160,858 | 0,959 | 99,4% |
+| 1M | MySQL | Q4 | 3.049,647 | 3.160,366 | -3,6% |
+| 1M | MySQL | Q5 | 412,866 | 286,763 | 30,5% |
+| 1M | MySQL | Q6 | 472,748 | 351,112 | 25,7% |
+| 1M | MySQL | Q7 | 0,496 | 0,498 | -0,4% |
+| 1M | MySQL | Q8 | 377,022 | 238,862 | 36,6% |
+| 1M | MongoDB | Q1 | 0,387 | 0,408 | -5,5% |
+| 1M | MongoDB | Q2 | 584,627 | 0,524 | 99,9% |
+| 1M | MongoDB | Q3 | 559,381 | 0,745 | 99,9% |
+| 1M | MongoDB | Q4 | 4.548,580 | 4.884,114 | -7,4% |
+| 1M | MongoDB | Q5 | 813,981 | 227,972 | 72,0% |
+| 1M | MongoDB | Q6 | 1.220,147 | 632,492 | 48,2% |
+| 1M | MongoDB | Q7 | 0,796 | 0,805 | -1,2% |
+| 1M | MongoDB | Q8 | 831,448 | 243,674 | 70,7% |
 
-Vì chỉ có một mức pilot và không có số liệu latency theo quy mô, RQ6
-chưa được trả lời bằng thực nghiệm. Không thể suy diễn tuyến tính từ
-1.000 lên 100.000 hoặc 3 triệu đơn. Cần chạy lại trên máy có đủ dung
-lượng và tài nguyên, hoặc dùng máy/VM được cấp riêng, giữ cấu hình cố
-định và ghi nhận đầy đủ.
+Các số liệu cho thấy Q3 là truy vấn hưởng lợi rõ nhất ở cả hai DBMS.
+Q2 của MongoDB cũng giảm rất mạnh khi index phù hợp được tạo. Q5, Q6
+và Q8 có cải thiện đáng kể. Trái lại, Q4 chậm hơn sau khi thêm index;
+đây có thể là truy vấn tổng hợp mà bộ index hiện tại không hỗ trợ đủ
+hiệu quả. Các thay đổi rất nhỏ ở Q1/Q7 cần được xem trong bối cảnh
+độ nhiễu đo, không nên diễn giải thành suy giảm hiệu năng có ý nghĩa.
 
-## 12.1. Kế hoạch đo bổ sung
+## RQ5. Có/không có workload secondary index trong cùng workload và quy mô
 
-8.  Tạo ba mức dữ liệu đã chốt, xác nhận manifest và tính tương đương
-    trước khi benchmark.
+Trong phạm vi cấu hình đã thử, index làm giảm median latency của phần
+lớn truy vấn, nhưng mức cải thiện khác nhau rõ rệt theo query và DBMS.
+Đây là câu trả lời định lượng cho so sánh baseline/indexed ở hai quy mô
+100.000 và 1.000.000 đơn. Tuy nhiên, benchmark chỉ so sánh một bộ
+secondary index theo workload với baseline; chưa tách riêng từng index
+đơn, compound, covering hoặc multikey để quy kết đóng góp của từng index.
+Không có cơ sở để tuyên bố MySQL hoặc MongoDB nhanh hơn một cách tổng
+quát, vì mỗi hệ có truy vấn thắng/thua khác nhau.
 
-9.  Mỗi mức chạy hai DBMS với cùng bộ tham số truy vấn và các cấu hình
-    index tách biệt.
+## RQ6. Ảnh hưởng của quy mô dữ liệu
 
-10. Warm-up, chạy tối thiểu nhiều lần cho mỗi truy vấn; báo cáo median,
-    p95, p99 và độ lệch chuẩn.
+Đã chạy hai quy mô 100.000 và 1.000.000 đơn. Thời gian tạo workload
+index ở quy mô 100.000 là 0,767 giây (MySQL) và 1,051 giây (MongoDB);
+ở quy mô 1.000.000 là 6,767 giây và 10,271 giây tương ứng. Dung lượng
+index tăng theo quy mô: ở 100.000 đơn, tổng index bytes ghi nhận là
+19,12 MB (MySQL) và 5,12 MB (MongoDB) ở baseline, tăng lên 21,25 MB
+và 11,18 MB ở indexed; ở 1.000.000 đơn, các giá trị lần lượt là
+162,68 MB và 40,28 MB ở baseline, tăng lên 185,70 MB và 106,23 MB.
+Đây là kích thước index tổng theo metadata DBMS, không chỉ riêng phần
+index vừa tạo.
 
-11. Đo riêng read, write, import và index build; không trộn thời gian
-    sinh dữ liệu vào thời gian nạp DB.
+Không thể xem chênh lệch latency giữa hai quy mô là một phép đo scaling
+hoàn toàn được kiểm soát, vì hai matrix job chạy trên CPU model khác
+nhau (dù cùng 4 logical CPU và khoảng 16 GB RAM). Quy mô 10.000.000
+đơn chưa chạy: riêng file dữ liệu thô ước lượng khoảng 7 GB, chưa tính
+database files, index và overhead của hai DBMS, vượt ngân sách dung
+lượng an toàn của runner hiện tại. Vì vậy RQ6 có bằng chứng ở hai mức
+đầu, nhưng chưa kết luận được hành vi ở 10 triệu đơn hay điểm vượt cache.
 
-12. Lưu explain, raw CSV, cấu hình phần cứng và log hệ thống cho từng
-    lượt.
+## 12.2. Giới hạn diễn giải và kế hoạch tiếp theo
 
-# 13. RQ7 (BỔ SUNG): KHUYẾN NGHỊ THEO NGHIỆP VỤ
+sequential_ops_per_second trong summary là nghịch đảo của mean latency
+cho một client tuần tự, không phải throughput dưới tải đồng thời. CI
+không thu thập CPU utilization, I/O throughput hoặc cache hit ratio
+trong từng truy vấn. p95/p99 và 30 mẫu latency có trong raw/summary CSV
+của artifact, nhưng kết luận chính ở đây dùng median để giảm ảnh hưởng
+outlier. Muốn đánh giá production cần benchmark concurrency, tải hỗn
+hợp đọc/ghi, cold-cache và nhiều lần lặp trên cùng phần cứng.
 
-Các khuyến nghị dưới đây là định hướng thiết kế, không phải kết luận xếp
-hạng hiệu năng. Chúng cần được xác nhận bằng benchmark có kiểm soát
-trước khi áp dụng ngoài phạm vi project.
+Các bước còn lại là chạy mức 10 triệu đơn trên máy có đủ dung lượng,
+tách riêng từng loại secondary index và đo thêm tài nguyên hệ thống.
+Không ngoại suy kết quả 100 nghìn/1 triệu thành kết luận cho 10 triệu.
 
-| **Nghiệp vụ**                | **Chiến lược gợi ý**                                          | **Điều kiện / lưu ý**                                  |
-|------------------------------|---------------------------------------------------------------|--------------------------------------------------------|
-| Tra cứu đơn theo mã          | PK trong MySQL; \_id trong MongoDB                            | Equality lookup, chi phí thấp và ổn định               |
-| Lịch sử mua hàng             | Compound (customer_id, order_date); Mongo thêm \_id tie-break | Thứ tự trường bám filter và sort                       |
-| Lọc đơn theo trạng thái/ngày | Compound (status, order_date)                                 | Kiểm tra selectivity của status                        |
-| Chi tiết đơn hàng            | MySQL JOIN theo FK; Mongo embedding items/payments            | Mongo document có giới hạn kích thước và số phần tử    |
-| Báo cáo doanh thu            | Index hỗ trợ lọc ngày; tối ưu aggregation và đo scan          | Index không loại bỏ chi phí group/sum lớn              |
-| Top sản phẩm/danh mục        | Index product_id / items.product_id                           | Multikey index hỗ trợ lọc mảng; group vẫn cần xử lý    |
-| Ghi đơn và trừ kho           | Transaction MySQL; Mongo transaction đa document              | Index cần thiết nhưng tránh dư thừa vì tăng write cost |
+# 13. HẠN CHẾ, HƯỚNG PHÁT TRIỂN VÀ KẾT LUẬN
 
-## 13.1. Khi nào nghiêng về MySQL?
+## 13.1. Hạn chế
 
-Khi nghiệp vụ yêu cầu quan hệ chặt, nhiều ràng buộc FK, truy vấn JOIN
-linh hoạt và giao dịch nhiều bảng là trung tâm, MySQL/InnoDB là lựa chọn
-tự nhiên. Các truy vấn phân tích quan hệ và ràng buộc dữ liệu có thể
-được biểu diễn trực tiếp trong SQL.
+- Benchmark latency đã được xác nhận ở hai quy mô 100.000 và 1.000.000
+  đơn; chưa chạy 10.000.000 đơn do giới hạn dung lượng runner.
 
-## 13.2. Khi nào nghiêng về MongoDB?
+- Chỉ so sánh baseline với một cấu hình workload secondary index; chưa
+  cô lập đóng góp của từng index đơn, compound, covering và multikey.
 
-Khi dữ liệu có cấu trúc document rõ, nhiều thao tác đọc một aggregate
-như đơn hàng cùng items/payments, và schema cần linh hoạt theo sản phẩm,
-MongoDB có thể giảm số lượt đọc/join. Khi thao tác chạm nhiều document
-như tồn kho, transaction vẫn cần thiết; không nên đánh đồng embedding
-với việc mọi giao dịch đều chỉ atomic trên một document.
+- Hai quy mô benchmark chạy trên CPU model khác nhau; không dùng chênh
+  lệch tuyệt đối giữa chúng để suy ra tốc độ tăng trưởng do dữ liệu.
 
-## 13.3. Index nên tránh
+- CI dùng một client tuần tự; chưa đo throughput đồng thời, CPU, RAM,
+  I/O hoặc cache hit/miss trong từng truy vấn.
 
-Tránh tạo index chỉ vì một cột xuất hiện trong schema. Cần chứng minh
-truy vấn sử dụng, selectivity đủ tốt và lợi ích đọc vượt chi phí
-ghi/dung lượng. Index trùng lặp, compound sai thứ tự hoặc index trên
-trường có cardinality thấp trong workload không phù hợp có thể làm hệ
-thống nặng hơn.
+- Các script nghiệp vụ đã qua CI tích hợp trên MySQL 8.4 và MongoDB 8.0
+  replica set với fixture nhỏ; CI benchmark là một luồng kiểm thử riêng.
 
-# 14. HẠN CHẾ, HƯỚNG PHÁT TRIỂN VÀ KẾT LUẬN
+## 13.2. Hướng phát triển
 
-## 14.1. Hạn chế
+1. Chạy benchmark 10 triệu đơn trên máy/VM có đủ dung lượng và RAM, giữ
+   phần cứng cố định giữa các quy mô.
+2. Tách cấu hình index đơn, compound, covering và multikey để đánh giá
+   đóng góp riêng của từng index.
+3. Đo warm/cold cache, concurrency, throughput và latency percentiles.
+4. Thu thập CPU, RAM, I/O, cache hit/miss, chi phí import và dung lượng
+   database/index.
+5. Bổ sung workload hỗn hợp đọc/ghi và kiểm tra race condition W1/W2/W3.
+6. Thử workload thực tế hơn, dữ liệu từ nhiều cửa hàng và các mẫu báo
+   cáo mở rộng.
 
-- Dữ liệu tổng hợp, phân phối Zipf và trạng thái đơn là giả định; không
-  đại diện dữ liệu bán hàng thực.
-
-- Chỉ pilot 1.000 đơn được xác nhận; chưa có benchmark
-  latency/throughput ở quy mô lớn.
-
-- Chưa hoàn thành ma trận cấu hình index đơn, compound, covering và
-  baseline một cách tách biệt.
-
-- Môi trường kiểm thử là một máy Windows; chưa thử sharding hoặc cụm
-  nhiều máy.
-
-- Không có đầy đủ log CPU, RAM, I/O, cache, concurrency và số lần lặp
-  cho phép so sánh hiệu năng thống kê.
-
-- Các script hiện tại đã qua CI tích hợp trên MySQL 8.4 và MongoDB 8.0
-  với fixture nhỏ; cần đối chiếu lại trên bộ pilot đầy đủ trước khi phát
-  hành và trước khi chạy benchmark.
-
-## 14.2. Hướng phát triển
-
-13. Bổ sung harness benchmark chung cho MySQL và MongoDB, xuất raw CSV
-    và cấu hình máy.
-
-14. Tách các mức index và kiểm soát index bắt buộc (PK/\_id, unique, FK
-    support) khỏi secondary index theo workload.
-
-15. Đo warm/cold cache, concurrency, throughput và latency percentiles.
-
-16. Chạy các mức dữ liệu theo khả năng tài nguyên; ghi thời gian import,
-    build index, dung lượng database/index.
-
-17. Bổ sung test âm cho W1/W2/W3, kiểm tra rollback và race condition.
-
-18. Thử workload thực tế hơn, dữ liệu từ nhiều cửa hàng và các mẫu báo
-    cáo mở rộng.
-
-## 14.3. Kết luận
+## 13.3. Kết luận
 
 Project đã hình thành được hai mô hình dữ liệu tương ứng, bộ sinh dữ
 liệu chung, workload Q1–Q8, các thao tác ghi W1–W3 và các index chính
-phục vụ truy vấn. Pilot 1.000 đơn xác nhận dữ liệu được sinh và nạp, kết
-quả truy vấn nghiệp vụ đối chiếu khớp trong các lần kiểm thử đã ghi
-nhận; execution plan cho thấy các index chính được sử dụng ở Q1/Q2.
+phục vụ truy vấn. Pilot 1.000 đơn xác nhận chức năng; benchmark có kiểm
+soát ở 100.000 và 1.000.000 đơn cung cấp bằng chứng định lượng về ảnh
+hưởng của workload secondary index.
 
-Tuy nhiên, câu hỏi về mức cải thiện thời gian truy vấn và ảnh hưởng khi
-quy mô tăng vẫn cần benchmark có kiểm soát. Kết luận có trách nhiệm hiện
-tại là: Index có vai trò quan trọng về đường truy cập, nhưng lợi ích
-định lượng và lựa chọn DBMS tối ưu phụ thuộc workload, mô hình dữ liệu,
-cấu hình hệ thống và quy mô. Không có cơ sở để tuyên bố một hệ luôn
-nhanh hơn hệ còn lại.
+Kết quả không cho thấy một DBMS thắng ở mọi truy vấn. Index cải thiện
+rất mạnh Q3 ở cả hai hệ và MongoDB Q2, cải thiện Q5/Q6/Q8 ở các mức độ
+khác nhau, nhưng Q4 chậm hơn và Q1/Q7 gần như không đổi. Do đó, lựa
+chọn DBMS và index phải dựa trên workload cụ thể, chi phí dung lượng,
+thời gian tạo/duy trì index và tài nguyên triển khai. Chưa có kết quả
+10 triệu đơn nên không kết luận về giới hạn mở rộng ở quy mô đó.
 
 # TÀI LIỆU THAM KHẢO
 
@@ -793,11 +812,10 @@ cập 24/11/2026).
 
 ## PHỤ LỤC B. Quy ước diễn giải số liệu
 
-Mọi con số pilot trong báo cáo là kết quả kiểm thử chức năng đã được
-nhóm ghi nhận ở quy mô 1.000 đơn. Không có con số latency, throughput,
-p95, p99, CPU, RAM hoặc I/O nào được dựng thêm. Khi benchmark được chạy,
-cần bổ sung raw results, thông tin cấu hình, số lần lặp và biểu đồ có
-nguồn dữ liệu đi kèm.
-
-Báo cáo này là bản tổng hợp kỹ thuật trung thực theo bằng chứng hiện có;
-các kết luận RQ5 và RQ6 được đánh dấu chưa đủ dữ liệu thay vì suy đoán.
+Số liệu pilot 1.000 đơn là kết quả kiểm thử chức năng. Số liệu latency
+trong mục 12 lấy từ artifact benchmark của GitHub Actions run #7, gồm
+raw CSV, summary CSV, metadata phần cứng/phần mềm và index build time.
+Mỗi truy vấn có 30 mẫu sau 5 lượt warm-up. Không dựng thêm số liệu CPU,
+I/O hoặc cache hit/miss; các chỉ số này chưa được thu thập. Kết quả
+benchmark chỉ áp dụng cho hai quy mô 100.000 và 1.000.000 đơn, hai cấu
+hình index đã thử và môi trường CI được mô tả trong báo cáo.
