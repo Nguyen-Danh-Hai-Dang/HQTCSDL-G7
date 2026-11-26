@@ -29,6 +29,7 @@ BEGIN
   DECLARE v_total DECIMAL(24,2);
   DECLARE v_pid INT UNSIGNED;
   DECLARE v_qty SMALLINT UNSIGNED;
+  DECLARE v_transaction_started BOOLEAN DEFAULT FALSE;
 
   DECLARE cur_inventory CURSOR FOR
     SELECT jt.product_id, jt.quantity
@@ -43,7 +44,9 @@ BEGIN
 
   DECLARE EXIT HANDLER FOR SQLEXCEPTION
   BEGIN
-    ROLLBACK;
+    IF v_transaction_started THEN
+      ROLLBACK;
+    END IF;
     RESIGNAL;
   END;
 
@@ -96,6 +99,7 @@ BEGIN
   END IF;
 
   START TRANSACTION;
+  SET v_transaction_started = TRUE;
 
   SELECT COUNT(*) INTO v_count
   FROM customer WHERE customer_id = p_customer_id;
@@ -190,7 +194,8 @@ BEGIN
   END;
 
   COMMIT;
-END$$
+  SET v_transaction_started = FALSE;
+END$
 
 CREATE PROCEDURE W2_mark_paid(IN p_order_id BIGINT UNSIGNED)
 BEGIN
