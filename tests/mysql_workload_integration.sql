@@ -11,7 +11,7 @@ INSERT INTO product (product_id, sku, name, category_id, price, created_at) VALU
   (3, 'CI-003', 'Product 3', 1, 30.00, UTC_TIMESTAMP());
 INSERT INTO inventory (store_id, product_id, quantity) VALUES
   (1, 1, 3),
-  (1, 2, 0),
+  (1, 2, 1),
   (1, 3, 2147483640);
 
 -- Successful multi-line W1: payment total and inventory must match.
