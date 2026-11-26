@@ -236,11 +236,13 @@ CREATE PROCEDURE W3_restock(
   IN p_quantity INT UNSIGNED
 )
 BEGIN
-  IF p_quantity = 0 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'W3: quantity must be positive';
+  -- inventory.quantity là INT có dấu trong MySQL: miền hợp lệ 0..2^31-1.
+  IF p_quantity = 0 OR p_quantity > 2147483647 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'W3: quantity must be in 1..2147483647';
   END IF;
   UPDATE inventory SET quantity = quantity + p_quantity
-    WHERE store_id = p_store_id AND product_id = p_product_id;
+    WHERE store_id = p_store_id AND product_id = p_product_id
+      AND quantity <= 2147483647 - p_quantity;
   IF ROW_COUNT() <> 1 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'W3: inventory row not found';
   END IF;
