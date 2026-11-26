@@ -6,7 +6,7 @@
 // =====================================================================
 use("shop_bench");
 
-const oid  = 123456, cid = 5439;
+const oid  = 8, cid = 506;
 const d1   = ISODate("2025-03-01T00:00:00Z"), d2   = ISODate("2025-04-01T00:00:00Z");
 const day1 = ISODate("2025-03-15T00:00:00Z"), day2 = ISODate("2025-03-22T00:00:00Z");
 const EXCL = ["CANCELLED", "RETURNED"];
@@ -149,6 +149,7 @@ function _W1_body(sdb, newOid, payId, customerId, storeId, lines) {
     return { line_no: index + 1, product_id: line.pid,
              quantity: line.qty, unit_price: price };
   });
+  if (total > 99999999999999n) throw new Error("PAYMENT_AMOUNT_OUT_OF_RANGE");
   sdb.orders.insertOne({
     _id: newOid, customer_id: customerId, store_id: storeId,
     order_date: new Date(), status: "PENDING", items,
