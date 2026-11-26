@@ -29,13 +29,14 @@ hàng bằng mã định danh.
 
 Phần mã nguồn gồm schema, validator, index, bộ sinh dữ liệu, workload
 Q1–Q8, thao tác ghi W1–W3 và script nạp dữ liệu. Trong quá trình rà
-soát, nhóm phát hiện một số điểm chưa an toàn ở thao tác ghi: W1 MySQL
-ban đầu không thực hiện rollback thật khi thiếu tồn kho; W2 chưa kiểm
-tra tính nhất quán giữa đơn và thanh toán; W1 MongoDB không transaction
-có nguy cơ để lại đơn hàng chưa trừ kho. Các script đã được chỉnh theo
-hướng kiểm tra điều kiện, transaction và rollback, nhưng bản chỉnh sửa
-mới cần được chạy xác nhận lại trên môi trường của nhóm trước khi xem là
-đã nghiệm thu.
+soát, nhóm phát hiện và sửa các điểm chưa an toàn ở thao tác ghi: W1
+MySQL được bổ sung kiểm tra đầu vào, transaction và rollback thật khi
+thiếu tồn kho; W1 MongoDB dùng transaction đa document; W2 kiểm tra
+trạng thái đơn và payment; W3 kiểm soát miền số lượng tồn kho. Sau khi
+chỉnh sửa, ba job CI đã chạy thành công: kiểm thử generator, tích hợp
+MySQL 8.4 và MongoDB 8.0 replica set. Các job này xác nhận những nhánh
+nghiệp vụ trọng yếu trên fixture nhỏ, không thay thế benchmark hoặc
+kiểm thử lại toàn bộ pilot.
 
 Thực nghiệm pilot 1.000 đơn được dùng để xác nhận chức năng, không dùng
 để kết luận hiệu năng ở quy mô lớn. Pilot ghi nhận 1.000 đơn, 2.705 dòng
@@ -492,13 +493,18 @@ GitHub Actions chạy ba job độc lập trên môi trường dùng một lần
   nhiều dòng và rollback khi thiếu hàng; W2 chuyển đơn/payment sang PAID;
   W3 nhập kho thành công và từ chối tràn giới hạn INT32.
 
-Cả ba job đều PASS trên commit `8f42f2c` của nhánh
-`fix/generator-w1-parity`. Đây là kiểm thử tích hợp tự động trên fixture
-nhỏ, nhằm xác nhận cú pháp procedure, transaction và các nhánh nghiệp vụ
-quan trọng. Nó không thay thế kiểm thử lại trên toàn bộ pilot 1.000 đơn,
-không xác nhận Q1–Q8 trên commit mới và không phải benchmark latency/
-throughput. Các kết quả pilot lịch sử ở mục 9.1 được giữ riêng, không
-đánh đồng với fixture CI.
+Cả ba job đều PASS trong GitHub Actions run
+[#38](https://github.com/Nguyen-Danh-Hai-Dang/HQTCSDL-G7/actions/runs/45771934254),
+trên PR head commit `32b123b1a660e8cd90f4c1e2f0b7abcc5a8c7f4b`.
+PR #1 sau đó được merge vào `main` bằng merge commit
+`ef47d88dc29bbcb6738868e1ad1bd861b6939d27`. Workflow hiện được cấu hình
+chạy theo pull request nên run #38 xác nhận chính xác nội dung head đã
+được merge, không phải một lần chạy mới trên merge commit. Đây là kiểm
+thử tích hợp tự động trên fixture nhỏ, nhằm xác nhận cú pháp procedure,
+transaction và các nhánh nghiệp vụ quan trọng. Nó không thay thế kiểm
+thử lại trên toàn bộ pilot 1.000 đơn, không xác nhận Q1–Q8 trên commit
+mới và không phải benchmark latency/throughput. Các kết quả pilot lịch
+sử ở mục 9.1 được giữ riêng, không đánh đồng với fixture CI.
 
 # 10. EXECUTION PLAN VÀ DIỄN GIẢI
 
