@@ -3,7 +3,8 @@
 Sinh dữ liệu tổng hợp cho so sánh MySQL vs MongoDB (quản lý bán hàng).
 
 - Chỉ dùng thư viện chuẩn Python 3.8+ (không cần cài thêm).
-- Tái lập: cùng --seed và cùng tham số => đầu ra giống hệt nhau từng byte.
+- Tái lập: cùng phiên bản, --seed và tham số => CSV/JSONL giống hệt nhau từng byte.
+- Mỗi đơn chỉ chứa sản phẩm có bản ghi inventory tại cửa hàng của đơn.
 - Một lần sinh ghi ra CẢ HAI định dạng nên hai CSDL chứa cùng dữ liệu logic:
     <out>/<scale>/mysql/*.csv     (nạp bằng LOAD DATA)
     <out>/<scale>/mongo/*.jsonl   (nạp bằng mongoimport, Extended JSON)
@@ -82,6 +83,19 @@ def cum(weights):
 
 def wpick(rng, vals, cw):
     return vals[bisect(cw, rng.random() * cw[-1])]
+
+
+def weighted_sample_without_replacement(rng, vals, weights, k):
+    """Lấy mẫu có trọng số, không lặp; dùng làm phương án dự phòng hữu hạn."""
+    remaining_vals = list(vals)
+    remaining_weights = list(weights)
+    selected = []
+    for _ in range(k):
+        cw = cum(remaining_weights)
+        idx = bisect(cw, rng.random() * cw[-1])
+        selected.append(remaining_vals.pop(idx))
+        remaining_weights.pop(idx)
+    return selected
 
 
 def zipf_table(n, s, rng):
@@ -173,6 +187,7 @@ def main():
     # ---------------- sản phẩm + tồn kho ----------------
     rp = R("products")
     price = [0] * (n_prd + 1)                     # đơn vị: cent (số nguyên, tránh sai số float)
+    store_products = {s: [] for s in range(1, N_STORES + 1)}
     with opener(f"{my}/product.csv") as fp, opener(f"{mo}/products.jsonl") as fpj, \
             opener(f"{my}/inventory.csv") as fi, opener(f"{mo}/inventory.jsonl") as fij:
         wp, wi = csv.writer(fp), csv.writer(fi)
@@ -188,6 +203,7 @@ def main():
             jdump(fpj, {"_id": i, "sku": sku, "name": nm, "category_id": cat,
                         "price": dec(cents), "created_at": ts_json(created)})
             for s in sorted(rp.sample(range(1, N_STORES + 1), STOCKED_STORES_PER_PRODUCT)):
+                store_products[s].append(i)
                 inv_id += 1
                 q = rp.randint(0, 500)
                 wi.writerow([s, i, q])
@@ -198,6 +214,14 @@ def main():
     ro = R("orders")
     rz = R("zipf")
     prod_ids, prod_cw = zipf_table(n_prd, ZIPF_S_PRODUCT, rz)
+    prod_rank = {pid: rank for rank, pid in enumerate(prod_ids)}
+    store_product_cw = {}
+    for sid, eligible_ids in store_products.items():
+        eligible_ids.sort(key=prod_rank.__getitem__)
+        if len(eligible_ids) < max(N_ITEMS[0]):
+            raise RuntimeError(f"Store {sid} has fewer eligible products than the maximum order size")
+        weights = [1.0 / ((prod_rank[pid] + 1) ** ZIPF_S_PRODUCT) for pid in eligible_ids]
+        store_product_cw[sid] = cum(weights)
     cust_ids, cust_cw = zipf_table(n_cus, ZIPF_S_CUSTOMER, rz)
     st_cw, me_cw = cum(STATUS[1]), cum(METHOD[1])
     ni_cw, qt_cw = cum(N_ITEMS[1]), cum(QTY[1])
@@ -218,14 +242,21 @@ def main():
             status = wpick(ro, STATUS[0], st_cw)
             k = wpick(ro, N_ITEMS[0], ni_cw)
 
+            eligible_ids = store_products[sid]
+            eligible_cw = store_product_cw[sid]
             pids, seen = [], set()
-            while len(pids) < k:
-                for p in ro.choices(prod_ids, cum_weights=prod_cw, k=k + 2):
-                    if p not in seen:
-                        seen.add(p)
-                        pids.append(p)
-                        if len(pids) == k:
-                            break
+            attempts = 0
+            max_attempts = max(100, k * 50)
+            while len(pids) < k and attempts < max_attempts:
+                pid = wpick(ro, eligible_ids, eligible_cw)
+                attempts += 1
+                if pid not in seen:
+                    seen.add(pid)
+                    pids.append(pid)
+            if len(pids) < k:
+                weights = [1.0 / ((prod_rank[pid] + 1) ** ZIPF_S_PRODUCT)
+                           for pid in eligible_ids]
+                pids = weighted_sample_without_replacement(ro, eligible_ids, weights, k)
 
             items, total = [], 0
             for ln, pid in enumerate(pids, 1):
@@ -302,6 +333,8 @@ def main():
             "hot_customer_id": cust_cnt.most_common(1)[0][0],
             "hot_product_id": prod_cnt.most_common(1)[0][0],
         },
+        "orders_with_missing_inventory": 0,
+        "order_items_with_missing_inventory": 0,
         "elapsed_seconds": round(time.time() - t0, 1),
     }
     with open(os.path.join(base, "manifest.json"), "w", encoding="utf-8") as f:
